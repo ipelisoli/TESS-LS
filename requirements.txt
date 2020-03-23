@@ -1,0 +1,5 @@
+astropy>=4.0
+astroquery>=0.4
+matplotlib
+numpy
+scipy
