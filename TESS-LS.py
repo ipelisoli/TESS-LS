@@ -34,8 +34,10 @@ obj_name = "TIC " + str(TIC)
 
 # Output ascii light curve?
 flag_lc = int(input("Would you like an ascii file of the processed light curve?\n0 = no, 1 = yes: "))
-
+# Output ascii periodogram?
 flag_ls = int(input("Would you like an ascii file of the Lomb-Scargle periodogram?\n0 = no, 1 = yes: "))
+# Output ascii phase?
+flag_ph = int(input("Would you like an ascii file of the phased data?\n0 = no, 1 = yes: "))
 
 # Then we check data at MAST
 # WARNING! Even with this tiny search radius, sometimes there is still more
@@ -84,7 +86,7 @@ if (len(infile) > 1):
             err_flux = np.append(err_flux, ef / np.nanmean(f))
             header=TESSdata[1].header
             crowdsap.append(header['CROWDSAP'])
-            
+
 # Data pre-processing: removing nan values
 
 index = ~(np.isnan(BJD) | np.isnan(flux))
@@ -112,7 +114,7 @@ if (flag_lc == 1):
 # Calculate input parameters for the periodogram
 
 #calculates the Nyquist frequency that determines the upper limit in frequency
-dt = [ t[i+1] - t[i-1] for i in range(1,len(t)-1)] 
+dt = [ t[i+1] - t[i-1] for i in range(1,len(t)-1)]
 fmax = 1.0/np.median(dt)
 
 #the lower limit is set by the duration of the light curve
@@ -141,6 +143,10 @@ flux_phased = [flux for phase, flux in sorted(zip(phase, flux))]
 err_flux_phased = [err_flux for phase, err_flux in sorted(zip(phase, err_flux))]
 phase = np.sort(phase)
 
+if (flag_ph == 1):
+    ascii.write([phase, flux_phased, err_flux_phased], 'TIC%09d_phase.dat'%(TIC),
+                names=['Phase','RelativeFlux','Error'], overwrite=True)
+
 
 # Calculates a running average every 100 points for better visualisation
 
@@ -160,7 +166,7 @@ params, params_covariance = optimize.curve_fit(sine_func, phase_avg,
 y_fit = 1.0 + params[0] * np.sin(2.*pi*phase_avg + params[1])
 
 
-log = open('TIC%09d.log'%(TIC), "w") 
+log = open('TIC%09d.log'%(TIC), "w")
 log.write("TIC %09d\n"%(TIC))
 log.write("Number of sectors: %2d\n"%(len(infile)))
 log.write("CROWDSAP: %5.3f\n"%(np.mean(crowdsap)))
