@@ -38,6 +38,10 @@ flag_lc = int(input("Would you like an ascii file of the processed light curve?\
 flag_ls = int(input("Would you like an ascii file of the Lomb-Scargle periodogram?\n0 = no, 1 = yes: "))
 # Output ascii phase?
 flag_ph = int(input("Would you like an ascii file of the phased data?\n0 = no, 1 = yes: "))
+# Is the period actually 2*P?
+flag_p2 = int(input("Would you like to multiply the period by two?\n"
+                    "(useful for ellipsoidal variables and some eclipsing systems)\n"
+                    "0 = no, 1 = yes: "))
 
 # Then we check data at MAST
 # WARNING! Even with this tiny search radius, sometimes there is still more
@@ -137,6 +141,9 @@ if (flag_ls == 1):
 best_f = freq[np.argmax(power)]
 period = 1.0/best_f #period from the LS periodogram
 
+if (flag_p2 == 1):
+    period = 2.0*period
+
 phase = ((t - t[0]) / period) % 1.0 #phases the data
 
 flux_phased = [flux for phase, flux in sorted(zip(phase, flux))]
@@ -159,12 +166,17 @@ err_flux_phased_avg = np.convolve(err_flux_phased, np.ones((100,))/100, mode='va
 # It won't look good for eclipsing binaries anyway
 
 def sine_func(x, a, b):
-    return 1.0+a*np.sin(2.*pi*x + b)
+    if (flag_p2 == 1):
+        return 1.0+a*np.sin(4.*pi*x + b)
+    else:
+        return 1.0+a*np.sin(2.*pi*x + b)
 params, params_covariance = optimize.curve_fit(sine_func, phase_avg,
                                                flux_phased_avg,
                                                p0=[np.mean(flux), 0.0])
-y_fit = 1.0 + params[0] * np.sin(2.*pi*phase_avg + params[1])
-
+if (flag_p2 == 1):
+    y_fit = 1.0 + params[0] * np.sin(4.*pi*phase_avg + params[1])
+else:
+    y_fit = 1.0 + params[0] * np.sin(2.*pi*phase_avg + params[1])
 
 log = open('TIC%09d.log'%(TIC), "w")
 log.write("TIC %09d\n"%(TIC))
