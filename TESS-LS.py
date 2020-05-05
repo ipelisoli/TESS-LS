@@ -161,7 +161,6 @@ phase_avg = np.convolve(phase, np.ones((100,))/100, mode='valid')
 flux_phased_avg = np.convolve(flux_phased, np.ones((100,))/100, mode='valid')
 err_flux_phased_avg = np.convolve(err_flux_phased, np.ones((100,))/100, mode='valid')
 
-
 # Fits the averaged phase, only for the original period.
 # It won't look good for eclipsing binaries anyway
 
@@ -178,14 +177,6 @@ if (flag_p2 == 1):
 else:
     y_fit = 1.0 + params[0] * np.sin(2.*pi*phase_avg + params[1])
 
-log = open('TIC%09d.log'%(TIC), "w")
-log.write("TIC %09d\n"%(TIC))
-log.write("Number of sectors: %2d\n"%(len(infile)))
-log.write("CROWDSAP: %5.3f\n"%(np.mean(crowdsap)))
-log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent"%(period, 100*abs(params[0])))
-log.close()
-
-
 # Can we find this thing in Gaia?
 
 coord = SkyCoord(ra=obsTable[0][5], dec=obsTable[0][6],
@@ -194,9 +185,24 @@ radius = u.Quantity(3.0, u.arcsec)
 q = Gaia.cone_search_async(coord, radius)
 gaia = q.get_results()
 
-
+gaia_id = gaia['source_id']
 MG = 5 + 5*np.log10(gaia['parallax']/1000) + gaia['phot_g_mean_mag']
 bprp = gaia['bp_rp']
+
+gaia_id = np.int(gaia_id)
+MG = np.float(MG)
+bprp = np.float(bprp)
+
+# Writing log file
+
+log = open('TIC%09d.log'%(TIC), "w")
+log.write("TIC %09d\n\n"%(TIC))
+log.write("Gaia DR2 source_id = %20d\n"%(gaia_id))
+log.write("MG = %5.3f, bp_rp = %5.3f\n\n"%(MG, bprp))
+log.write("Number of sectors: %2d\n"%(len(infile)))
+log.write("CROWDSAP: %5.3f\n"%(np.mean(crowdsap)))
+log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent"%(period, 100*abs(params[0])))
+log.close()
 
 table = parse_single_table("SampleC.vot")
 data = table.array
