@@ -185,8 +185,16 @@ radius = u.Quantity(3.0, u.arcsec)
 q = Gaia.cone_search_async(coord, radius)
 gaia = q.get_results()
 
+# High proper motion objects are sometimes not found, so we might need a
+# larger search radius
+warning = (len(gaia) == 0)
+if warning:
+    radius = u.Quantity(10.0, u.arcsec)
+    q = Gaia.cone_search_async(coord, radius)
+    gaia = q.get_results()
+
 gaia_id = gaia['source_id']
-MG = 5 + 5*np.log10(gaia['parallax']/1000) + gaia['phot_g_mean_mag']
+MG = 5 + 5*np.log10(gaia['parallax'][0]/1000) + gaia['phot_g_mean_mag']
 bprp = gaia['bp_rp']
 
 gaia_id = np.int(gaia_id)
@@ -197,6 +205,8 @@ bprp = np.float(bprp)
 
 log = open('TIC%09d.log'%(TIC), "w")
 log.write("TIC %09d\n\n"%(TIC))
+if warning:
+    log.write("Warning! No Gaia match within 3 arcsec. Increased search radius to 10 arcsec.\n")
 log.write("Gaia DR2 source_id = %20d\n"%(gaia_id))
 log.write("MG = %5.3f, bp_rp = %5.3f\n\n"%(MG, bprp))
 log.write("Number of sectors: %2d\n"%(len(infile)))
