@@ -181,7 +181,7 @@ else:
 
 coord = SkyCoord(ra=obsTable[0][5], dec=obsTable[0][6],
                  unit=(u.degree, u.degree), frame='icrs')
-radius = u.Quantity(3.0, u.arcsec)
+radius = u.Quantity(5.0, u.arcsec)
 q = Gaia.cone_search_async(coord, radius)
 gaia = q.get_results()
 
@@ -193,20 +193,34 @@ if warning:
     q = Gaia.cone_search_async(coord, radius)
     gaia = q.get_results()
 
-gaia_id = gaia['source_id']
-MG = 5 + 5*np.log10(gaia['parallax'][0]/1000) + gaia['phot_g_mean_mag']
-bprp = gaia['bp_rp']
+# Check if more than one object was found
+duplicated = (len(gaia) > 1)
+if duplicated:
+    id_list = np.array(gaia['source_id'])
+    G_list = np.array(gaia['phot_g_mean_mag'])
+    plx_list = np.array(gaia['parallax'])
+    bprp_list = np.array(gaia['bp_rp'])
+    brightest = np.argmin(G_list)
+    gaia_id = id_list[brightest]
+    MG = 5 + 5*np.log10(plx_list[brightest]/1000) + G_list[brightest]
+    bprp = bprp_list[brightest]
+else:
+    gaia_id = gaia['source_id']
+    MG = 5 + 5*np.log10(gaia['parallax']/1000) + gaia['phot_g_mean_mag']
+    bprp = gaia['bp_rp']
 
-gaia_id = np.int(gaia_id)
-MG = np.float(MG)
-bprp = np.float(bprp)
+    gaia_id = np.int(gaia_id)
+    MG = np.float(MG)
+    bprp = np.float(bprp)
 
 # Writing log file
 
 log = open('TIC%09d.log'%(TIC), "w")
 log.write("TIC %09d\n\n"%(TIC))
 if warning:
-    log.write("Warning! No Gaia match within 3 arcsec. Increased search radius to 10 arcsec.\n")
+    log.write("Warning! No Gaia match within 5 arcsec. Increased search radius to 10 arcsec.\n")
+if duplicated:
+    log.write("Warning! More than one match in Gaia. Brightest match was chosen.\n")
 log.write("Gaia DR2 source_id = %20d\n"%(gaia_id))
 log.write("MG = %5.3f, bp_rp = %5.3f\n\n"%(MG, bprp))
 log.write("Number of sectors: %2d\n"%(len(infile)))
