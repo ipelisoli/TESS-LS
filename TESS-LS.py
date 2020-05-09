@@ -16,7 +16,8 @@ from scipy import optimize
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import astropy.units as u
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, Distance
+from astropy.time import Time
 from astroquery.mast import Observations
 from astroquery.gaia import Gaia
 from astropy.io import fits
@@ -179,35 +180,49 @@ else:
 
 # Can we find this thing in Gaia?
 
+# First do a large search using 30 arcsec
+
 coord = SkyCoord(ra=obsTable[0][5], dec=obsTable[0][6],
                  unit=(u.degree, u.degree), frame='icrs')
-radius = u.Quantity(5.0, u.arcsec)
+radius = u.Quantity(30.0, u.arcsec)
 q = Gaia.cone_search_async(coord, radius)
 gaia = q.get_results()
-
-# High proper motion objects are sometimes not found, so we might need a
-# larger search radius
+gaia = gaia[ gaia['parallax'] > 0 ]
 warning = (len(gaia) == 0)
-if warning:
-    radius = u.Quantity(10.0, u.arcsec)
-    q = Gaia.cone_search_async(coord, radius)
-    gaia = q.get_results()
 
-# Check if more than one object was found
-duplicated = (len(gaia) > 1)
-if duplicated:
-    id_list = np.array(gaia['source_id'])
-    G_list = np.array(gaia['phot_g_mean_mag'])
-    plx_list = np.array(gaia['parallax'])
-    bprp_list = np.array(gaia['bp_rp'])
-    brightest = np.argmin(G_list)
-    gaia_id = id_list[brightest]
-    MG = 5 + 5*np.log10(plx_list[brightest]/1000) + G_list[brightest]
-    bprp = bprp_list[brightest]
-else:
-    gaia_id = gaia['source_id']
-    MG = 5 + 5*np.log10(gaia['parallax']/1000) + gaia['phot_g_mean_mag']
-    bprp = gaia['bp_rp']
+# Then propagate the Gaia coordinates to 2000, and find the best match to the
+# input coordinates
+if not warning:
+    ra2015 = np.array(gaia['ra']) * u.deg
+    dec2015 = np.array(gaia['dec']) * u.deg
+    parallax = np.array(gaia['parallax']) * u.mas
+    pmra = np.array(gaia['pmra']) * u.mas/u.yr
+    pmdec = np.array(gaia['pmdec']) * u.mas/u.yr
+    c2015 = SkyCoord(ra=ra2015, dec=dec2015,
+                     distance=Distance(parallax=parallax, allow_negative=True),
+                     pm_ra_cosdec=pmra, pm_dec=pmdec,
+                     obstime=Time(2015.5, format='decimalyear'))
+    c2000 = c2015.apply_space_motion(dt=-15.5 * u.year)
+
+    idx, sep, _ = coord.match_to_catalog_sky(c2000)
+
+    # All objects
+    id_all = gaia['source_id']
+    plx_all = np.array(gaia['parallax'])
+    g_all = np.array(gaia['phot_g_mean_mag'])
+    MG_all = 5 + 5*np.log10(plx_all/1000) + g_all
+    bprp_all = np.array(gaia['bp_rp'])
+
+    id_all = np.array(id_all)
+    MG_all = np.array(MG_all)
+    bprp_all = np.array(bprp_all)
+
+    # The best match object
+    best = gaia[idx]
+    gaia_id = best['source_id']
+
+    MG = 5 + 5*np.log10(best['parallax']/1000) + best['phot_g_mean_mag']
+    bprp = best['bp_rp']
 
     gaia_id = np.int(gaia_id)
     MG = np.float(MG)
@@ -218,14 +233,19 @@ else:
 log = open('TIC%09d.log'%(TIC), "w")
 log.write("TIC %09d\n\n"%(TIC))
 if warning:
-    log.write("Warning! No Gaia match within 5 arcsec. Increased search radius to 10 arcsec.\n")
-if duplicated:
-    log.write("Warning! More than one match in Gaia. Brightest match was chosen.\n")
+    log.write("Warning! No object with measured parallax within 30 arcsec.\n")
 log.write("Gaia DR2 source_id = %20d\n"%(gaia_id))
 log.write("MG = %5.3f, bp_rp = %5.3f\n\n"%(MG, bprp))
 log.write("Number of sectors: %2d\n"%(len(infile)))
 log.write("CROWDSAP: %5.3f\n"%(np.mean(crowdsap)))
-log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent"%(period, 100*abs(params[0])))
+log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent\n\n"%(period, 100*abs(params[0])))
+if (len(gaia)>0):
+    log.write("Other matches within 30 arcsec:\n")
+    log.write("source_id            MG    bp_rp\n")
+    for i in range(0, len(gaia)):
+        if i != idx:
+            log.write("%20d %5.3f %5.3f\n"%(id_all[i], MG_all[i], bprp_all[i]))
+
 log.close()
 
 table = parse_single_table("SampleC.vot")
@@ -233,7 +253,6 @@ data = table.array
 
 s_MG = 5 + 5*np.log10(table.array['parallax']/1000) + table.array['phot_g_mean_mag']
 s_bprp = table.array['bp_rp']
-
 
 # Let's plot all this
 
@@ -255,10 +274,11 @@ plt.xlabel('P [h]')
 plt.ylabel('Power')
 
 plt.subplot2grid((3,2), (0,1), colspan=1, rowspan=1)
-plt.plot(s_bprp,s_MG,'.k', markersize=0.5, zorder=0)
+plt.scatter(s_bprp,s_MG,c='0.75', s=0.5, zorder=0)
+plt.scatter(bprp_all,MG_all,marker='s',c='b', s=10, zorder=1)
 plt.gca().invert_yaxis()
 plt.title('$Gaia$ HR-diagram')
-plt.plot(bprp,MG,'or',markersize=5.0,zorder=1)
+plt.plot(bprp,MG,'or',markersize=10,zorder=2)
 plt.ylabel('$M_G$')
 plt.xlabel('$G_{BP}-G_{RP}$')
 
