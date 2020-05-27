@@ -16,7 +16,8 @@ from scipy import optimize
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import astropy.units as u
-from astropy.coordinates import SkyCoord, Distance
+from astropy import wcs
+from astropy.coordinates import SkyCoord, Distance, Angle
 from astropy.time import Time
 from astroquery.mast import Observations
 from astroquery.gaia import Gaia
@@ -56,15 +57,31 @@ obsTable = Observations.query_criteria(dataproduct_type="timeseries",
                                        radius="0.00000001 deg")
 
 # Download the light curves
-
 data = Observations.get_product_list(obsTable)
-download = Observations.download_products(data,productSubGroupDescription="LC")
-
-infile = download[0][:]
+download_lc = Observations.download_products(data,productSubGroupDescription="LC")
+infile = download_lc[0][:]
 
 print("I have found a total of " + str(len(infile)) + " light curve(s).")
 
-# Download data for the first sector
+# Dowload target pixel file for plotting
+
+tp_data = Observations.filter_products(data,productSubGroupDescription="TP")
+tp_id = str(tp_data['obsID'][0]) # We only need one TP
+download_tp = Observations.download_products(tp_id,productSubGroupDescription="TP")
+tp = download_tp[0][0]
+with fits.open(tp) as TPdata:
+    # Create WCS object
+    tp_wcs = wcs.WCS(naxis=2)
+    tp_wcs.wcs.crpix = [TPdata[1].header['1CRPX4'], TPdata[1].header['2CRPX4']]
+    tp_wcs.wcs.cdelt = [TPdata[1].header['1CDLT4'], TPdata[1].header['2CDLT4']]
+    tp_wcs.wcs.crval = [TPdata[1].header['1CRVL4'], TPdata[1].header['2CRVL4']]
+    tp_wcs.wcs.ctype = [TPdata[1].header['1CTYP4'], TPdata[1].header['2CTYP4']]
+
+    data=TPdata[1].data
+    flux_map = data['FLUX']
+    flux_map = flux_map[0]
+
+# Open data for the first sector
 
 crowdsap = []
 
@@ -78,7 +95,7 @@ with fits.open(infile[0]) as TESSdata:
     header=TESSdata[1].header
     crowdsap.append(header['CROWDSAP'])
 
-# If there are more sectors, download data for the remaning sectors
+# If there are more sectors, open data for the remaning sectors
 
 if (len(infile) > 1):
     for i in range(1,len(infile)):
@@ -91,6 +108,8 @@ if (len(infile) > 1):
             err_flux = np.append(err_flux, ef / np.nanmean(f))
             header=TESSdata[1].header
             crowdsap.append(header['CROWDSAP'])
+BJD_or = BJD
+flux_or = flux
 
 # Data pre-processing: removing nan values
 
@@ -187,7 +206,7 @@ coord = SkyCoord(ra=obsTable[0][5], dec=obsTable[0][6],
 radius = u.Quantity(30.0, u.arcsec)
 q = Gaia.cone_search_async(coord, radius)
 gaia = q.get_results()
-gaia = gaia[ gaia['parallax'] > 0 ]
+gaia = gaia[ np.nan_to_num(gaia['parallax']) > 0 ]
 warning = (len(gaia) == 0)
 
 # Then propagate the Gaia coordinates to 2000, and find the best match to the
@@ -228,6 +247,11 @@ if not warning:
     MG = np.float(MG)
     bprp = np.float(bprp)
 
+    # Coordinates for plotting
+    radecs = np.vstack([c2000.ra, c2000.dec]).T
+    coords = tp_wcs.all_world2pix(radecs, 0)
+    sizes = 10000.0 / 2**(g_all/2)
+
 # Writing log file
 
 log = open('TIC%09d.log'%(TIC), "w")
@@ -264,14 +288,14 @@ plt.rcParams.update({'font.size': 22})
 gridspec.GridSpec(3,2)
 
 plt.subplot2grid((3,2), (0,0), colspan=1, rowspan=1)
-plt.plot(1.0/freq, power, color ='k')
-plt.xlim(min(1.0/freq),max(1.0/freq))
-plt.axhline(ls.false_alarm_level(0.01),color='b')
-#plt.axvspan(100., max(1.0/freq), alpha=0.5, color='red')
 plt.title('TIC %d'%(TIC))
-plt.xscale('log')
-plt.xlabel('P [h]')
-plt.ylabel('Power')
+plt.imshow(flux_map, interpolation='nearest')
+plt.scatter(coords[:, 0], coords[:, 1], c='firebrick', alpha=0.5, edgecolors='r', s=sizes)
+plt.scatter(coords[:, 0], coords[:, 1], c='None', edgecolors='r', s=sizes)
+plt.ylabel('Pixel count')
+plt.xlabel('Pixel count')
+plt.xlim(0,10)
+plt.ylim(10,0)
 
 plt.subplot2grid((3,2), (0,1), colspan=1, rowspan=1)
 plt.scatter(s_bprp,s_MG,c='0.75', s=0.5, zorder=0)
@@ -283,8 +307,26 @@ plt.ylabel('$M_G$')
 plt.xlabel('$G_{BP}-G_{RP}$')
 
 plt.subplot2grid((3,2), (1,0), colspan=2, rowspan=1)
+plt.title('%s sector/s'%len(infile))
+plt.xlabel("BJD - 2457000")
 plt.ylabel('Relative flux')
-plt.title('%s sector/s, P = %5.2f h'%(len(infile),period))
+plt.xlim(np.min(BJD), np.max(BJD))
+plt.scatter(BJD_or, flux_or, c='0.25', zorder=1, s = 0.5)
+plt.scatter(BJD, flux, c='k', zorder=1, s = 0.5)
+
+plt.subplot2grid((3,2), (2,0), colspan=1, rowspan=1)
+plt.title("Period = %5.2f h"%period)
+plt.plot(1.0/freq, power, color ='k')
+plt.xlim(min(1.0/freq),max(1.0/freq))
+plt.axhline(ls.false_alarm_level(0.01),color='b')
+#plt.axvspan(100., max(1.0/freq), alpha=0.5, color='red')
+plt.xscale('log')
+plt.xlabel('P [h]')
+plt.ylabel('Power')
+
+plt.subplot2grid((3,2), (2,1), colspan=2, rowspan=1)
+plt.xlabel('Phase')
+plt.ylabel('Relative flux')
 plt.xlim(0,2)
 plt.errorbar(phase,flux_phased, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
 plt.plot(phase_avg,flux_phased_avg,'.k', zorder=1)
@@ -293,16 +335,6 @@ plt.errorbar(phase+1.0,flux_phased, fmt='.', color='0.5', markersize=0.75, eline
 plt.plot(phase_avg+1.0,flux_phased_avg,'.k', zorder=1)
 plt.plot(phase_avg+1.0,y_fit,'-r',zorder=2)
 
-plt.subplot2grid((3,2), (2,0), colspan=2, rowspan=1)
-plt.xlabel('Phase')
-plt.ylabel('Relative flux')
-plt.xlim(0,2)
-#plt.errorbar(phase,flux_phased, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-plt.plot(phase_avg,flux_phased_avg,'.k', zorder=1)
-plt.plot(phase_avg,y_fit,'-r',zorder=2)
-#plt.errorbar(phase+1.0,flux_phased, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-plt.plot(phase_avg+1.0,flux_phased_avg,'.k', zorder=1)
-plt.plot(phase_avg+1.0,y_fit,'-r',zorder=2)
-
+plt.tight_layout()
 
 fig.savefig('TIC%09d.png'%(TIC))

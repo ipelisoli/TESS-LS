@@ -3,3 +3,4 @@ mastDownload/
 *.log
 *.dat
 *.png
+.DS_Store
