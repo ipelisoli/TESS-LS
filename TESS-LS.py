@@ -29,6 +29,50 @@ from astropy.io.votable import parse_single_table
 from math import pi
 import sys
 
+# Defining useful functions
+
+def periodogram(t, flux, flux_err):
+    dt = [ t[i+1] - t[i-1] for i in range(1,len(t)-1)]
+    fmax = 1.0/np.median(dt)
+    fmin = 2.0/(max(t))
+    ls = LombScargle(t, flux, flux_err)
+    #Oversampling a factor of 10 to achieve frequency resolution
+    freq, power = ls.autopower(minimum_frequency=fmin,
+                               maximum_frequency=fmax,
+                               samples_per_peak=10)
+    best_f = freq[np.argmax(power)]
+    period = 1.0/best_f #period from the LS periodogram
+    fap_p = ls.false_alarm_probability(power.max())
+    fap_001 = ls.false_alarm_level(0.01)
+    return freq, power, period, fap_p, fap_001
+
+def running_mean(x, N):
+    cumsum = np.cumsum(np.insert(x, 0, 0))
+    return (cumsum[N:] - cumsum[:-N]) / float(N)
+    #return np.convolve(x, np.ones((N,))/N, mode='valid')
+
+def chi_sq(guess, x, y, err, factor):
+    a, b = guess
+    model = 1.0+a*np.sin(factor*2.0*pi*x + b)
+    var = np.array(err)*np.array(err)
+    chisq = np.sum((model - y) * (model - y)/var)
+    return chisq
+
+def phase_data(t, flux, flux_err, period, factor):
+    period = factor*period
+    phase = ((t - t[0]) / period) % 1.0
+    flux_phased = [flux for phase, flux in sorted(zip(phase, flux))]
+    flux_err_phased = [flux_err for phase, flux_err in sorted(zip(phase, flux_err))]
+    phase = np.sort(phase)
+    # Fit the data
+    initial = np.array([np.mean(flux), 0.0])
+    solution = optimize.minimize(chi_sq, initial,args=(phase,
+                                                        flux_phased,
+                                                        flux_err_phased,
+                                                        factor))
+    flux_fit = 1.0 + solution.x[0] * np.sin(factor*2.*np.pi*phase + solution.x[1])
+    return phase, flux_phased, flux_err_phased, flux_fit, solution.x[0]
+
 # First we define the object name using the TIC
 
 TIC = np.int(sys.argv[1])
@@ -128,74 +172,33 @@ flux = flux[index]
 err_flux = err_flux[index]
 BJD = BJD[index]
 
-
 t = (BJD - BJD[0])*24.0 #time in hours
 
 if (flag_lc == 1):
     ascii.write([BJD, flux, err_flux], 'TIC%09d_lc.dat'%(TIC),
                 names=['BJD','RelativeFlux','Error'], overwrite=True)
 
-# Calculate input parameters for the periodogram
-
-#calculates the Nyquist frequency that determines the upper limit in frequency
-dt = [ t[i+1] - t[i-1] for i in range(1,len(t)-1)]
-fmax = 1.0/np.median(dt)
-
-#the lower limit is set by the duration of the light curve
-fmin = 2.0/(max(t))
-
 # Calculates the periodogram
 
-ls = LombScargle(t, flux, err_flux)
-# Oversampling by a factor of 10 to achieve frequency resolution
-freq, power = ls.autopower(minimum_frequency=fmin, maximum_frequency=fmax,
-                           samples_per_peak=10)
+freq, power, period, fap_p, fap_001 = periodogram(t, flux, err_flux)
 
 if (flag_ls == 1):
     ascii.write([1/freq, power], 'TIC%09d_ls.dat'%(TIC),
                 names=['Period[h]','Power'], overwrite=True)
 
-
 # Folds the data to the dominant peak
+phase, flux_phased, flux_err_phased, flux_fit, amp = phase_data(t, flux, err_flux, period, 1.0)
 
-best_f = freq[np.argmax(power)]
-period = 1.0/best_f #period from the LS periodogram
-
-if (flag_p2 == 1):
-    period = 2.0*period
-
-phase = ((t - t[0]) / period) % 1.0 #phases the data
-
-flux_phased = [flux for phase, flux in sorted(zip(phase, flux))]
-err_flux_phased = [err_flux for phase, err_flux in sorted(zip(phase, err_flux))]
-phase = np.sort(phase)
+# Folds the data to twice the dominant peak
+phase2, flux_phased2, flux_err_phased2, flux_fit2, amp2 = phase_data(t, flux, err_flux, period, 2.0)
 
 if (flag_ph == 1):
-    ascii.write([phase, flux_phased, err_flux_phased], 'TIC%09d_phase.dat'%(TIC),
-                names=['Phase','RelativeFlux','Error'], overwrite=True)
-
-
-# Calculates a running average every 100 points for better visualisation
-
-phase_avg = np.convolve(phase, np.ones((100,))/100, mode='valid')
-flux_phased_avg = np.convolve(flux_phased, np.ones((100,))/100, mode='valid')
-err_flux_phased_avg = np.convolve(err_flux_phased, np.ones((100,))/100, mode='valid')
-
-# Fits the averaged phase, only for the original period.
-# It won't look good for eclipsing binaries anyway
-
-def sine_func(x, a, b):
     if (flag_p2 == 1):
-        return 1.0+a*np.sin(4.*pi*x + b)
+        ascii.write([phase2, flux_phased2, flux_err_phased2], 'TIC%09d_phase.dat'%(TIC),
+                     names=['Phase','RelativeFlux','Error'], overwrite=True)
     else:
-        return 1.0+a*np.sin(2.*pi*x + b)
-params, params_covariance = optimize.curve_fit(sine_func, phase_avg,
-                                               flux_phased_avg,
-                                               p0=[np.mean(flux), 0.0])
-if (flag_p2 == 1):
-    y_fit = 1.0 + params[0] * np.sin(4.*pi*phase_avg + params[1])
-else:
-    y_fit = 1.0 + params[0] * np.sin(2.*pi*phase_avg + params[1])
+        ascii.write([phase, flux_phased, flux_err_phased], 'TIC%09d_phase.dat'%(TIC),
+                     names=['Phase','RelativeFlux','Error'], overwrite=True)
 
 # Can we find this thing in Gaia?
 
@@ -262,7 +265,10 @@ log.write("Gaia DR2 source_id = %20d\n"%(gaia_id))
 log.write("MG = %5.3f, bp_rp = %5.3f\n\n"%(MG, bprp))
 log.write("Number of sectors: %2d\n"%(len(infile)))
 log.write("CROWDSAP: %5.3f\n"%(np.mean(crowdsap)))
-log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent\n\n"%(period, 100*abs(params[0])))
+if (flag_p2 == 1):
+    log.write("Period = %9.5f hours, Amplitude =  %7.5f per cent\n\n"%(2.0*period, 100*abs(amp2)))
+else:
+    log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent\n\n"%(period, 100*abs(amp2)))
 if (len(gaia)>0):
     log.write("Other matches within 30 arcsec:\n")
     log.write("source_id            MG    bp_rp\n")
@@ -318,7 +324,7 @@ plt.subplot2grid((3,2), (2,0), colspan=1, rowspan=1)
 plt.title("Period = %5.2f h"%period)
 plt.plot(1.0/freq, power, color ='k')
 plt.xlim(min(1.0/freq),max(1.0/freq))
-plt.axhline(ls.false_alarm_level(0.01),color='b')
+plt.axhline(fap_001, color='b')
 #plt.axvspan(100., max(1.0/freq), alpha=0.5, color='red')
 plt.xscale('log')
 plt.xlabel('P [h]')
@@ -329,11 +335,11 @@ plt.xlabel('Phase')
 plt.ylabel('Relative flux')
 plt.xlim(0,2)
 plt.errorbar(phase,flux_phased, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-plt.plot(phase_avg,flux_phased_avg,'.k', zorder=1)
-plt.plot(phase_avg,y_fit,'-r',zorder=2)
+plt.plot(running_mean(phase,100), running_mean(flux_phased,100),'.k', zorder=1)
+plt.plot(phase, flux_fit, '-r', zorder=2)
 plt.errorbar(phase+1.0,flux_phased, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-plt.plot(phase_avg+1.0,flux_phased_avg,'.k', zorder=1)
-plt.plot(phase_avg+1.0,y_fit,'-r',zorder=2)
+plt.plot(running_mean(phase,100)+1.0, running_mean(flux_phased,100),'.k', zorder=1)
+plt.plot(phase + 1.0, flux_fit,'-r',zorder=2)
 
 plt.tight_layout()
 
