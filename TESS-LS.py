@@ -66,9 +66,9 @@ def phase_data(t, flux, flux_err, period, factor):
     phase = np.sort(phase)
     # Fit the data
     initial = np.array([np.mean(flux), 0.0])
-    solution = optimize.minimize(chi_sq, initial,args=(phase,
-                                                        flux_phased,
-                                                        flux_err_phased,
+    solution = optimize.minimize(chi_sq, initial,args=(running_mean(phase,100),
+                                                       running_mean(flux_phased,100),
+                                                       running_mean(flux_err_phased,100),
                                                         factor))
     flux_fit = 1.0 + solution.x[0] * np.sin(factor*2.*np.pi*phase + solution.x[1])
     return phase, flux_phased, flux_err_phased, flux_fit, solution.x[0]
@@ -291,28 +291,29 @@ fig = plt.figure(figsize=(24,15))
 
 plt.rcParams.update({'font.size': 22})
 
-gridspec.GridSpec(6,14)
+gridspec.GridSpec(6,10)
 
-plt.subplot2grid((6,14), (0,0), colspan=2, rowspan=2)
+plt.subplot2grid((6,10), (0,0), colspan=2, rowspan=2)
 plt.title('TIC %d'%(TIC))
 plt.xlim(0,10)
 plt.ylim(10,0)
 plt.imshow(flux_map, interpolation='nearest')
 plt.scatter(coords[:, 0], coords[:, 1], c='firebrick', alpha=0.5, edgecolors='r', s=sizes)
 plt.scatter(coords[:, 0], coords[:, 1], c='None', edgecolors='r', s=sizes)
+plt.text(0.1, 9.9, 'crowdsap = %4.2f' % np.mean(crowdsap), color='w')
 plt.ylabel('Pixel count')
 plt.xlabel('Pixel count')
 
-plt.subplot2grid((6,14), (2,0), colspan=2, rowspan=2)
+plt.subplot2grid((6,10), (0,2), colspan=2, rowspan=2)
 plt.scatter(s_bprp,s_MG,c='0.75', s=0.5, zorder=0)
 plt.scatter(bprp_all,MG_all,marker='s',c='b', s=10, zorder=1)
 plt.gca().invert_yaxis()
-#plt.title('$Gaia$ HR-diagram')
+plt.title('$Gaia$ HR-diagram')
 plt.plot(bprp,MG,'or',markersize=10,zorder=2)
 plt.ylabel('$M_G$')
 plt.xlabel('$G_{BP}-G_{RP}$')
 
-plt.subplot2grid((6,14), (0,2), colspan=4, rowspan=4)
+plt.subplot2grid((6,10), (2,0), colspan=4, rowspan=2)
 plt.title("Period = %5.2f h"%period)
 plt.plot(1.0/freq, power, color ='k')
 plt.xlim(min(1.0/freq),max(1.0/freq))
@@ -322,7 +323,7 @@ plt.xscale('log')
 plt.xlabel('P [h]')
 plt.ylabel('Power')
 
-plt.subplot2grid((6,14), (4,0), colspan=6, rowspan=2)
+plt.subplot2grid((6,10), (4,0), colspan=4, rowspan=2)
 plt.title('%s sector/s'%len(infile))
 plt.xlabel("BJD - 2457000")
 plt.ylabel('Relative flux')
@@ -330,27 +331,29 @@ plt.xlim(np.min(BJD), np.max(BJD))
 plt.scatter(BJD_or, flux_or, c='0.25', zorder=1, s = 0.5)
 plt.scatter(BJD, flux, c='k', zorder=1, s = 0.5)
 
-plt.subplot2grid((6,14), (0,6), colspan=8, rowspan=3)
+plt.subplot2grid((6,10), (0,4), colspan=6, rowspan=3)
+plt.title('Phased to dominant peak')
 plt.xlabel('Phase')
 plt.ylabel('Relative flux')
 plt.xlim(0,2)
 plt.errorbar(phase,flux_phased, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
 plt.plot(running_mean(phase,100), running_mean(flux_phased,100),'.k', zorder=1)
-plt.plot(phase, flux_fit, '-r', zorder=2)
+plt.plot(phase, flux_fit, 'r--', lw = 3, zorder=2)
 plt.errorbar(phase+1.0,flux_phased, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
 plt.plot(running_mean(phase,100)+1.0, running_mean(flux_phased,100),'.k', zorder=1)
-plt.plot(phase + 1.0, flux_fit,'-r',zorder=2)
+plt.plot(phase + 1.0, flux_fit,'r--', lw = 3, zorder=2)
 
-plt.subplot2grid((6,14), (3,6), colspan=8, rowspan=3)
+plt.subplot2grid((6,10), (3,4), colspan=6, rowspan=3)
+plt.title('Phased to twice the peak')
 plt.xlabel('Phase')
 plt.ylabel('Relative flux')
 plt.xlim(0,2)
 plt.errorbar(phase2,flux_phased2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
 plt.plot(running_mean(phase2,100), running_mean(flux_phased2,100),'.k', zorder=1)
-plt.plot(phase2, flux_fit2, '-r', zorder=2)
+plt.plot(phase2, flux_fit2, 'r--', lw = 3, zorder=2)
 plt.errorbar(phase2+1.0,flux_phased2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
 plt.plot(running_mean(phase2,100)+1.0, running_mean(flux_phased2,100),'.k', zorder=1)
-plt.plot(phase2 + 1.0, flux_fit2,'-r',zorder=2)
+plt.plot(phase2 + 1.0, flux_fit2, 'r--', lw = 3, zorder=2)
 
 plt.tight_layout()
 
