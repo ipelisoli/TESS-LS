@@ -236,6 +236,7 @@ if not warning:
     bprp_all = np.array(gaia['bp_rp'])
 
     id_all = np.array(id_all)
+    g_all = np.array(gaia['phot_g_mean_mag'])
     MG_all = np.array(MG_all)
     bprp_all = np.array(bprp_all)
 
@@ -247,6 +248,7 @@ if not warning:
     bprp = best['bp_rp']
 
     gaia_id = np.int(gaia_id)
+    G = np.float(best['phot_g_mean_mag'])
     MG = np.float(MG)
     bprp = np.float(bprp)
 
@@ -262,7 +264,7 @@ log.write("TIC %09d\n\n"%(TIC))
 if warning:
     log.write("Warning! No object with measured parallax within 30 arcsec.\n")
 log.write("Gaia DR2 source_id = %20d\n"%(gaia_id))
-log.write("MG = %5.3f, bp_rp = %5.3f\n\n"%(MG, bprp))
+log.write("G = %6.3f, MG = %6.3f, bp_rp = %6.3f\n\n"%(G, MG, bprp))
 log.write("Number of sectors: %2d\n"%(len(infile)))
 log.write("CROWDSAP: %5.3f\n"%(np.mean(crowdsap)))
 if (flag_p2 == 1):
@@ -271,10 +273,10 @@ else:
     log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent\n\n"%(period, 100*abs(amp)))
 if (len(gaia)>0):
     log.write("Other matches within 30 arcsec:\n")
-    log.write("source_id            MG    bp_rp\n")
+    log.write("source_id            G       MG    bp_rp\n")
     for i in range(0, len(gaia)):
         if i != idx:
-            log.write("%20d %5.3f %5.3f\n"%(id_all[i], MG_all[i], bprp_all[i]))
+            log.write("%20d %6.3f %6.3f %6.3f\n"%(id_all[i], g_all[i], MG_all[i], bprp_all[i]))
 
 log.close()
 
