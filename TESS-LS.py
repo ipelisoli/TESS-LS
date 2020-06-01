@@ -268,7 +268,7 @@ log.write("CROWDSAP: %5.3f\n"%(np.mean(crowdsap)))
 if (flag_p2 == 1):
     log.write("Period = %9.5f hours, Amplitude =  %7.5f per cent\n\n"%(2.0*period, 100*abs(amp2)))
 else:
-    log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent\n\n"%(period, 100*abs(amp2)))
+    log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent\n\n"%(period, 100*abs(amp)))
 if (len(gaia)>0):
     log.write("Other matches within 30 arcsec:\n")
     log.write("source_id            MG    bp_rp\n")
