@@ -263,14 +263,18 @@ log = open('TIC%09d.log'%(TIC), "w")
 log.write("TIC %09d\n\n"%(TIC))
 if warning:
     log.write("Warning! No object with measured parallax within 30 arcsec.\n")
-log.write("Gaia DR2 source_id = %20d\n"%(gaia_id))
-log.write("G = %6.3f, MG = %6.3f, bp_rp = %6.3f\n\n"%(G, MG, bprp))
+else:
+    log.write("Gaia DR2 source_id = %20d\n"%(gaia_id))
+    log.write("G = %6.3f, MG = %6.3f, bp_rp = %6.3f\n\n"%(G, MG, bprp))
+
 log.write("Number of sectors: %2d\n"%(len(infile)))
 log.write("CROWDSAP: %5.3f\n"%(np.mean(crowdsap)))
+
 if (flag_p2 == 1):
     log.write("Period = %9.5f hours, Amplitude =  %7.5f per cent\n\n"%(2.0*period, 100*abs(amp2)))
 else:
     log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent\n\n"%(period, 100*abs(amp)))
+
 if (len(gaia)>0):
     log.write("Other matches within 30 arcsec:\n")
     log.write("source_id            G       MG    bp_rp\n")
@@ -300,18 +304,21 @@ plt.title('TIC %d'%(TIC))
 plt.xlim(0,10)
 plt.ylim(10,0)
 plt.imshow(flux_map, interpolation='nearest')
-plt.scatter(coords[:, 0], coords[:, 1], c='firebrick', alpha=0.5, edgecolors='r', s=sizes)
-plt.scatter(coords[:, 0], coords[:, 1], c='None', edgecolors='r', s=sizes)
+if not warning:
+    plt.scatter(coords[:, 0], coords[:, 1], c='firebrick', alpha=0.5, edgecolors='r', s=sizes)
+    plt.scatter(coords[:, 0], coords[:, 1], c='None', edgecolors='r', s=sizes)
 plt.text(0.1, 9.9, 'crowdsap = %4.2f' % np.mean(crowdsap), color='w')
 plt.ylabel('Pixel count')
 plt.xlabel('Pixel count')
 
 plt.subplot2grid((6,10), (0,2), colspan=2, rowspan=2)
 plt.scatter(s_bprp,s_MG,c='0.75', s=0.5, zorder=0)
-plt.scatter(bprp_all,MG_all,marker='s',c='b', s=10, zorder=1)
+if (len(gaia)>1):
+    plt.scatter(bprp_all,MG_all,marker='s',c='b', s=10, zorder=1)
 plt.gca().invert_yaxis()
 plt.title('$Gaia$ HR-diagram')
-plt.plot(bprp,MG,'or',markersize=10,zorder=2)
+if not warning:
+    plt.plot(bprp,MG,'or',markersize=10,zorder=2)
 plt.ylabel('$M_G$')
 plt.xlabel('$G_{BP}-G_{RP}$')
 
