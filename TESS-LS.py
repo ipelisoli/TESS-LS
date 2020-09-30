@@ -96,9 +96,7 @@ flag_p2 = int(input("Would you like to multiply the period by two?\n"
 
 obsTable = Observations.query_criteria(dataproduct_type="timeseries",
                                        project="TESS",
-                                       objectname=obj_name,
-                                       proposal_pi = "Ricker, George",
-                                       radius="0.00000001 deg")
+                                       target_name=TIC)
 
 # Download the light curves
 data = Observations.get_product_list(obsTable)
