@@ -159,13 +159,17 @@ s_bprp = table.array['bp_rp']
 
 #######  2-MINUTE DATA  ########
 
-# Read data
-BJD, flux, err_flux, crowdsap = tul.read_data(infile)
-BJD_or = BJD
-flux_or = flux
+slow_lc = tul.LCdata(TIC)
 
-# Data pre-processing
-BJD, flux, err_flux = tul.clean_data(BJD, flux, err_flux)
+slow_lc.read_data(infile)
+BJD_or = slow_lc.bjd
+flux_or = slow_lc.flux
+crowdsap = slow_lc.crowdsap
+
+slow_lc.clean_data()
+BJD = slow_lc.bjd
+flux = slow_lc.flux
+err_flux = slow_lc.flux_err
 
 t = (BJD - BJD[0])*24.0 #time in hours
 

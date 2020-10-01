@@ -4,6 +4,71 @@ from astropy.io import fits
 from astropy.timeseries import LombScargle
 from astropy.stats import sigma_clip
 
+class LCdata:
+
+    def __init__(self, tic):
+        self.tic = tic
+
+        self.bjd = []
+        self.flux = []
+        self.flux_err = []
+        self.crowdsap = []
+
+    def read_data(self, list):
+        crowdsap = []
+
+        # Open data for the first sector
+        with fits.open(list[0]) as TESSdata:
+            data=TESSdata[1].data
+            BJD = np.array(data['TIME'])
+            flux = np.array(data['PDCSAP_FLUX'])
+            err_flux = np.array(data['PDCSAP_FLUX_ERR'])
+            err_flux = err_flux / np.nanmean(flux)
+            flux = flux / np.nanmean(flux)
+            header=TESSdata[1].header
+            crowdsap.append(header['CROWDSAP'])
+
+            # If there are more sectors, open data for the remaning sectors
+            if (len(list) > 1):
+                for i in range(1,len(list)):
+                    with fits.open(list[i]) as TESSdata:
+                        data=TESSdata[1].data
+                        BJD = np.append(BJD, np.array(data['TIME']))
+                        f = np.array(data['PDCSAP_FLUX'])
+                        ef = np.array(data['PDCSAP_FLUX_ERR'])
+                        flux = np.append(flux, f / np.nanmean(f))
+                        err_flux = np.append(err_flux, ef / np.nanmean(f))
+                        header=TESSdata[1].header
+                        crowdsap.append(header['CROWDSAP'])
+
+        err_flux = err_flux / np.nanmean(flux)
+        flux = flux / np.nanmean(flux)
+
+        self.bjd.append(BJD)
+        self.flux.append(flux)
+        self.flux_err.append(err_flux)
+        self.crowdsap.append(crowdsap)
+
+    def clean_data(self):
+        self.bjd = np.array(self.bjd)
+        self.flux = np.array(self.flux)
+        self.flux_err = np.array(self.flux_err)
+        
+        # removing nan values
+        index = ~(np.isnan(self.bjd) | np.isnan(self.flux))
+
+        self.flux = self.flux[index]
+        self.flux_err = self.flux_err[index]
+        self.bjd = self.bjd[index]
+
+        # sigma-clipping
+        filtered_data = sigma_clip(self.flux, sigma=5, maxiters=None)
+        index = ~(filtered_data.mask)
+
+        self.flux = self.flux[index]
+        self.flux_err = self.flux_err[index]
+        self.bjd = self.bjd[index]
+
 def periodogram(t, flux, flux_err):
     dt = [ t[i+1] - t[i-1] for i in range(1,len(t)-1)]
     fmax = 1.0/np.median(dt)
@@ -45,55 +110,3 @@ def phase_data(t, flux, flux_err, period, factor):
                                                         factor))
     flux_fit = 1.0 + solution.x[0] * np.sin(factor*2.*np.pi*phase + solution.x[1])
     return phase, flux_phased, flux_err_phased, flux_fit, solution.x[0]
-
-def read_data(list):
-    # Open data for the first sector
-
-    crowdsap = []
-
-    with fits.open(list[0]) as TESSdata:
-        data=TESSdata[1].data
-        BJD = np.array(data['TIME'])
-        flux = np.array(data['PDCSAP_FLUX'])
-        err_flux = np.array(data['PDCSAP_FLUX_ERR'])
-        err_flux = err_flux / np.nanmean(flux)
-        flux = flux / np.nanmean(flux)
-        header=TESSdata[1].header
-        crowdsap.append(header['CROWDSAP'])
-
-        # If there are more sectors, open data for the remaning sectors
-
-        if (len(list) > 1):
-            for i in range(1,len(list)):
-                with fits.open(list[i]) as TESSdata:
-                    data=TESSdata[1].data
-                    BJD = np.append(BJD, np.array(data['TIME']))
-                    f = np.array(data['PDCSAP_FLUX'])
-                    ef = np.array(data['PDCSAP_FLUX_ERR'])
-                    flux = np.append(flux, f / np.nanmean(f))
-                    err_flux = np.append(err_flux, ef / np.nanmean(f))
-                    header=TESSdata[1].header
-                    crowdsap.append(header['CROWDSAP'])
-
-    err_flux = err_flux / np.nanmean(flux)
-    flux = flux / np.nanmean(flux)
-
-    return BJD, flux, err_flux, crowdsap
-
-def clean_data(t, f, err_f):
-    # removing nan values
-    index = ~(np.isnan(t) | np.isnan(f))
-
-    f = f[index]
-    err_f = err_f[index]
-    t = t[index]
-
-    # sigma-clipping
-    filtered_data = sigma_clip(f, sigma=5, maxiters=None)
-    index = ~(filtered_data.mask)
-
-    f = f[index]
-    err_f = err_f[index]
-    t = t[index]
-
-    return t, f, err_f
