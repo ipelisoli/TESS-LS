@@ -90,9 +90,6 @@ flag_p2 = int(input("Would you like to multiply the period by two?\n"
                     "0 = no, 1 = yes: "))
 
 # Then we check data at MAST
-# WARNING! Even with this tiny search radius, sometimes there is still more
-# than one object selected due to the huge TESS pixel size.
-# I will implement something to take care of this in the future.
 
 obsTable = Observations.query_criteria(dataproduct_type="timeseries",
                                        project="TESS",
@@ -103,7 +100,14 @@ data = Observations.get_product_list(obsTable)
 download_lc = Observations.download_products(data,productSubGroupDescription="LC")
 infile = download_lc[0][:]
 
-print("I have found a total of " + str(len(infile)) + " light curve(s).")
+print("I have found a total of " + str(len(infile)) + " 2-min light curve(s).")
+
+# Checking for fast cadence data
+download_fast_lc = Observations.download_products(data,
+                                                  productSubGroupDescription="FAST-LC")
+infile_fast = download_fast_lc[0][:]
+
+print("I have found a total of " + str(len(infile_fast)) + " 20-sec light curve(s).")
 
 # Dowload target pixel file for plotting
 
