@@ -1,6 +1,7 @@
 ## TESS-LS
 
 Given a TESS TIC name, downloads data for all available sectors, performs a period search using a Lomb-Scargle periodogram, and generates a quick-look plot.\
+Both low (2-min) and fast (20-sec) cadence data are downloaded, and processed separately.\
 It will also download the Target Pixel File (TPF) for the first available sector, for visualisation purposes.
 Additionally, it searches for objects in Gaia within a 30" radius of the coordinates in the image header (epoch propagation is taken into account).\
 \
