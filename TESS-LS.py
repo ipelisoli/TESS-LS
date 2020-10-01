@@ -26,7 +26,9 @@ import astropy.units as u
 import sys
 import TESSutils as tul
 
-# First we define the object name using the TIC
+#########  USER INPUT  #########
+
+# Define the object name using the TIC
 
 TIC = np.int(sys.argv[1])
 obj_name = "TIC " + str(TIC)
@@ -42,20 +44,26 @@ flag_p2 = int(input("Would you like to multiply the period by two?\n"
                     "(useful for ellipsoidal variables and some eclipsing systems)\n"
                     "0 = no, 1 = yes: "))
 
-# Then we check data at MAST
+################################
+
+#######  DOWNLOAD DATA  ########
+
+# Searching for data at MAST
 
 obsTable = Observations.query_criteria(dataproduct_type="timeseries",
                                        project="TESS",
                                        target_name=TIC)
 
-# Download the light curves
+# Download the 2-minute cadence light curves
+
 data = Observations.get_product_list(obsTable)
-download_lc = Observations.download_products(data,productSubGroupDescription="LC")
+download_lc = Observations.download_products(data, productSubGroupDescription="LC")
 infile = download_lc[0][:]
 
 print("I have found a total of " + str(len(infile)) + " 2-min light curve(s).")
 
-# Checking for fast cadence data
+# Download the 20-second cadence light curves
+
 download_fast_lc = Observations.download_products(data,
                                                   productSubGroupDescription="FAST-LC")
 infile_fast = download_fast_lc[0][:]
@@ -80,43 +88,9 @@ with fits.open(tp) as TPdata:
     flux_map = data['FLUX']
     flux_map = flux_map[0]
 
-# Read data
-BJD, flux, err_flux, crowdsap = tul.read_data(infile)
-BJD_or = BJD
-flux_or = flux
+################################
 
-# Data pre-processing
-BJD, flux, err_flux = tul.clean_data(BJD, flux, err_flux)
-
-t = (BJD - BJD[0])*24.0 #time in hours
-
-if (flag_lc == 1):
-    ascii.write([BJD, flux, err_flux], 'TIC%09d_lc.dat'%(TIC),
-                names=['BJD','RelativeFlux','Error'], overwrite=True)
-
-# Calculates the periodogram
-
-freq, power, period, fap_p, fap_001 = tul.periodogram(t, flux, err_flux)
-
-if (flag_ls == 1):
-    ascii.write([1/freq, power], 'TIC%09d_ls.dat'%(TIC),
-                names=['Period[h]','Power'], overwrite=True)
-
-# Folds the data to the dominant peak
-phase, flux_phased, flux_err_phased, flux_fit, amp = tul.phase_data(t, flux, err_flux, period, 1.0)
-
-# Folds the data to twice the dominant peak
-phase2, flux_phased2, flux_err_phased2, flux_fit2, amp2 = tul.phase_data(t, flux, err_flux, period, 2.0)
-
-if (flag_ph == 1):
-    if (flag_p2 == 1):
-        ascii.write([phase2, flux_phased2, flux_err_phased2], 'TIC%09d_phase.dat'%(TIC),
-                     names=['Phase','RelativeFlux','Error'], overwrite=True)
-    else:
-        ascii.write([phase, flux_phased, flux_err_phased], 'TIC%09d_phase.dat'%(TIC),
-                     names=['Phase','RelativeFlux','Error'], overwrite=True)
-
-# Can we find this thing in Gaia?
+#########  GAIA MATCH  #########
 
 # First do a large search using 30 arcsec
 
@@ -173,6 +147,54 @@ if not warning:
     coords = tp_wcs.all_world2pix(radecs, 0)
     sizes = 10000.0 / 2**(g_all/2)
 
+# Reference sample
+
+table = parse_single_table("SampleC.vot")
+data = table.array
+
+s_MG = 5 + 5*np.log10(table.array['parallax']/1000) + table.array['phot_g_mean_mag']
+s_bprp = table.array['bp_rp']
+
+################################
+
+#######  2-MINUTE DATA  ########
+
+# Read data
+BJD, flux, err_flux, crowdsap = tul.read_data(infile)
+BJD_or = BJD
+flux_or = flux
+
+# Data pre-processing
+BJD, flux, err_flux = tul.clean_data(BJD, flux, err_flux)
+
+t = (BJD - BJD[0])*24.0 #time in hours
+
+if (flag_lc == 1):
+    ascii.write([BJD, flux, err_flux], 'TIC%09d_lc.dat'%(TIC),
+                names=['BJD','RelativeFlux','Error'], overwrite=True)
+
+# Calculates the periodogram
+
+freq, power, period, fap_p, fap_001 = tul.periodogram(t, flux, err_flux)
+
+if (flag_ls == 1):
+    ascii.write([1/freq, power], 'TIC%09d_ls.dat'%(TIC),
+                names=['Period[h]','Power'], overwrite=True)
+
+# Folds the data to the dominant peak
+phase, flux_phased, flux_err_phased, flux_fit, amp = tul.phase_data(t, flux, err_flux, period, 1.0)
+
+# Folds the data to twice the dominant peak
+phase2, flux_phased2, flux_err_phased2, flux_fit2, amp2 = tul.phase_data(t, flux, err_flux, period, 2.0)
+
+if (flag_ph == 1):
+    if (flag_p2 == 1):
+        ascii.write([phase2, flux_phased2, flux_err_phased2], 'TIC%09d_phase.dat'%(TIC),
+                     names=['Phase','RelativeFlux','Error'], overwrite=True)
+    else:
+        ascii.write([phase, flux_phased, flux_err_phased], 'TIC%09d_phase.dat'%(TIC),
+                     names=['Phase','RelativeFlux','Error'], overwrite=True)
+
 # Writing log file
 
 log = open('TIC%09d.log'%(TIC), "w")
@@ -200,16 +222,9 @@ if (len(gaia)>0):
 
 log.close()
 
-table = parse_single_table("SampleC.vot")
-data = table.array
-
-s_MG = 5 + 5*np.log10(table.array['parallax']/1000) + table.array['phot_g_mean_mag']
-s_bprp = table.array['bp_rp']
-
-# Let's plot all this
+# Generate plot
 
 fig = plt.figure(figsize=(24,15))
-#fig.title('TIC %d'%(TIC))
 
 plt.rcParams.update({'font.size': 22})
 
@@ -283,3 +298,5 @@ plt.plot(phase2 + 1.0, flux_fit2, 'r--', lw = 3, zorder=2)
 plt.tight_layout()
 
 fig.savefig('TIC%09d.png'%(TIC))
+
+################################
