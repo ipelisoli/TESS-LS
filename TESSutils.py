@@ -89,16 +89,24 @@ class LCdata:
         freq, power = ls.autopower(minimum_frequency=fmin,
                                    maximum_frequency=fmax,
                                    samples_per_peak=10)
-        # Calculates treshold using a running median every 2000 points
-        mean_freq = avg_array(freq,2000)
-        mean_power = avg_array(power,2000)
-        treshold = np.interp(freq, mean_freq, mean_power)
-        # Finds the period looking for the local maximum
-        max_loc = np.argmax(power/treshold)
-        best_f = freq[max_loc]
-        period = 1.0/best_f
-        fap_p = ls.false_alarm_probability(power[max_loc])
+        # Find the dominant peak
+        best_f = freq[np.argmax(power)]
+        period = 1.0/best_f #period from the LS periodogram
+        fap_p = ls.false_alarm_probability(power.max())
         fap_001 = ls.false_alarm_level(0.01)
+        if (period > 30.0):
+            # Long periods are often spurious, search for a shorter minimum one
+
+            # Calculates treshold using a running median every 2000 points
+            mean_freq = avg_array(freq,2000)
+            mean_power = avg_array(power,2000)
+            treshold = np.interp(freq, mean_freq, mean_power)
+            # Finds the period looking for the local maximum
+            max_loc = np.argmax(power/treshold)
+            best_f = freq[max_loc]
+            period = 1.0/best_f
+            fap_p = ls.false_alarm_probability(power[max_loc])
+            fap_001 = ls.false_alarm_level(0.01)
 
         self.freq = np.array(freq)
         self.power = np.array(power)
