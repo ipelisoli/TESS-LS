@@ -51,15 +51,12 @@ class LCdata:
         err_flux = err_flux / np.nanmean(flux)
         flux = flux / np.nanmean(flux)
 
-        self.bjd.append(BJD)
-        self.flux.append(flux)
-        self.flux_err.append(err_flux)
-        self.crowdsap.append(crowdsap)
+        self.bjd = np.array(BJD)
+        self.flux = np.array(flux)
+        self.flux_err = np.array(err_flux)
+        self.crowdsap = np.array(crowdsap)
 
     def clean_data(self):
-        self.bjd = np.array(self.bjd)
-        self.flux = np.array(self.flux)
-        self.flux_err = np.array(self.flux_err)
 
         # removing nan values
         index = ~(np.isnan(self.bjd) | np.isnan(self.flux))
