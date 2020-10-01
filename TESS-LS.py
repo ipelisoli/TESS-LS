@@ -68,7 +68,6 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
     plt.xlim(min(1.0/f), max(1.0/f))
     plt.axhline(fap, color='b')
     plt.axvline(period, color='r', ls='--', zorder=0)
-
     #plt.axvspan(100., max(1.0/freq), alpha=0.5, color='red')
     plt.xscale('log')
     plt.xlabel('P [h]')
@@ -82,17 +81,25 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
     plt.scatter(bjd0, flux0, c='0.25', zorder=1, s = 0.5)
     plt.scatter(bjd, flux, c='k', zorder=1, s = 0.5)
 
+    phi_avg = tul.avg_array(phi,50)
+    fphi_avg = tul.avg_array(flux_phi,50)
+
     plt.subplot2grid((6,10), (0,4), colspan=6, rowspan=3)
     plt.title('Phased to dominant peak')
     plt.xlabel('Phase')
     plt.ylabel('Relative flux')
     plt.xlim(0,2)
     #plt.errorbar(phi, flux_phi, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-    plt.plot(tul.running_mean(phi,100), tul.running_mean(flux_phi,100),'.k', zorder=1)
+    plt.scatter(phi_avg, fphi_avg, marker='.', color='0.5', zorder=0)
+    plt.plot(tul.running_mean(phi_avg,15), tul.running_mean(fphi_avg,15),'.k', zorder=1)
     plt.plot(phi, fit, 'r--', lw = 3, zorder=2)
     #plt.errorbar(phi+1.0, flux_phi, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-    plt.plot(tul.running_mean(phi,100)+1.0, tul.running_mean(flux_phi,100),'.k', zorder=1)
+    plt.scatter(phi_avg+1.0, fphi_avg, marker='.', color='0.5', zorder=0)
+    plt.plot(tul.running_mean(phi_avg,15)+1.0, tul.running_mean(fphi_avg,15),'.k', zorder=1)
     plt.plot(phi + 1.0, fit,'r--', lw = 3, zorder=2)
+
+    phi_avg = tul.avg_array(phi2,50)
+    fphi_avg = tul.avg_array(flux_phi2,50)
 
     plt.subplot2grid((6,10), (3,4), colspan=6, rowspan=3)
     plt.title('Phased to twice the peak')
@@ -100,10 +107,12 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
     plt.ylabel('Relative flux')
     plt.xlim(0,2)
     #plt.errorbar(phi2, flux_phi2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-    plt.plot(tul.running_mean(phi2,100), tul.running_mean(flux_phi2,100),'.k', zorder=1)
+    plt.scatter(phi_avg, fphi_avg, marker='.', color='0.5', zorder=0)
+    plt.plot(tul.running_mean(phi_avg,15), tul.running_mean(fphi_avg,15),'.k', zorder=1)
     plt.plot(phi2, fit2, 'r--', lw = 3, zorder=2)
     #plt.errorbar(phi2+1.0, flux_phi2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-    plt.plot(tul.running_mean(phi2,100)+1.0, tul.running_mean(flux_phi2,100),'.k', zorder=1)
+    plt.scatter(phi_avg+1.0, fphi_avg, marker='.', color='0.5', zorder=0)
+    plt.plot(tul.running_mean(phi_avg,15)+1.0, tul.running_mean(fphi_avg,15),'.k', zorder=1)
     plt.plot(phi2 + 1.0, fit2, 'r--', lw = 3, zorder=2)
 
     plt.tight_layout()
@@ -152,11 +161,14 @@ print("I have found a total of " + str(len(infile)) + " 2-min light curve(s).")
 
 download_fast_lc = Observations.download_products(data,
                                                   productSubGroupDescription="FAST-LC")
-infile_fast = download_fast_lc[0][:]
 
-print("I have found a total of " + str(len(infile_fast)) + " 20-sec light curve(s).")
-
-fast = (len(infile_fast) > 0)
+if download_fast_lc is None:
+    print("I have found no 20-sec light curves.")
+    fast = False
+else:
+    infile_fast = download_fast_lc[0][:]
+    print("I have found a total of " + str(len(download_fast_lc[0][:])) + " 20-sec light curve(s).")
+    fast = True
 
 # Dowload target pixel file for plotting
 
@@ -299,6 +311,7 @@ plot.savefig('TIC%09d.png'%(TIC))
 ######  20-SECOND DATA  ########
 
 if fast:
+
     fast_lc = tul.LCdata(TIC)
 
     fast_lc.read_data(infile_fast)

@@ -89,9 +89,9 @@ class LCdata:
         freq, power = ls.autopower(minimum_frequency=fmin,
                                    maximum_frequency=fmax,
                                    samples_per_peak=10)
-        # Calculates treshold using a running mean every 100 points
-        mean_freq = running_mean(freq,100)
-        mean_power = running_mean(power,100)
+        # Calculates treshold using a running median every 2000 points
+        mean_freq = avg_array(freq,2000)
+        mean_power = avg_array(power,2000)
         treshold = np.interp(freq, mean_freq, mean_power)
         # Finds the period looking for the local maximum
         max_loc = np.argmax(power/treshold)
@@ -132,6 +132,10 @@ def running_mean(x, N):
     cumsum = np.cumsum(np.insert(x, 0, 0))
     return (cumsum[N:] - cumsum[:-N]) / float(N)
     #return np.convolve(x, np.ones((N,))/N, mode='valid')
+
+def avg_array(ar, n):
+    ar2 = np.nanmedian(np.pad(ar, (0, n - ar.size%n), mode='constant', constant_values=np.NaN).reshape(-1, n), axis=1)
+    return ar2
 
 def chi_sq(guess, x, y, err, factor):
     a, b = guess
