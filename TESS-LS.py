@@ -168,10 +168,9 @@ crowdsap = slow_lc.crowdsap
 
 slow_lc.clean_data()
 BJD = slow_lc.bjd
+t = slow_lc.t
 flux = slow_lc.flux
 err_flux = slow_lc.flux_err
-
-t = (BJD - BJD[0])*24.0 #time in hours
 
 if (flag_lc == 1):
     ascii.write([BJD, flux, err_flux], 'TIC%09d_lc.dat'%(TIC),
@@ -179,7 +178,12 @@ if (flag_lc == 1):
 
 # Calculates the periodogram
 
-freq, power, period, fap_p, fap_001 = tul.periodogram(t, flux, err_flux)
+slow_lc.periodogram()
+freq = slow_lc.freq
+power = slow_lc.power
+period = slow_lc.period
+fap_p = slow_lc.fap_p
+fap_001 = slow_lc.fap_001
 
 if (flag_ls == 1):
     ascii.write([1/freq, power], 'TIC%09d_ls.dat'%(TIC),

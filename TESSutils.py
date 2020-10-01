@@ -10,9 +10,16 @@ class LCdata:
         self.tic = tic
 
         self.bjd = []
+        self.t = []
         self.flux = []
         self.flux_err = []
         self.crowdsap = []
+
+        self.freq = []
+        self.power = []
+        self.period = []
+        self.fap_p = []
+        self.fap_001 = []
 
     def read_data(self, list):
         crowdsap = []
@@ -53,7 +60,7 @@ class LCdata:
         self.bjd = np.array(self.bjd)
         self.flux = np.array(self.flux)
         self.flux_err = np.array(self.flux_err)
-        
+
         # removing nan values
         index = ~(np.isnan(self.bjd) | np.isnan(self.flux))
 
@@ -68,21 +75,27 @@ class LCdata:
         self.flux = self.flux[index]
         self.flux_err = self.flux_err[index]
         self.bjd = self.bjd[index]
+        self.t = (self.bjd - self.bjd[0])*24.0
 
-def periodogram(t, flux, flux_err):
-    dt = [ t[i+1] - t[i-1] for i in range(1,len(t)-1)]
-    fmax = 1.0/np.median(dt)
-    fmin = 2.0/(max(t))
-    ls = LombScargle(t, flux, flux_err)
-    #Oversampling a factor of 10 to achieve frequency resolution
-    freq, power = ls.autopower(minimum_frequency=fmin,
-                               maximum_frequency=fmax,
-                               samples_per_peak=10)
-    best_f = freq[np.argmax(power)]
-    period = 1.0/best_f #period from the LS periodogram
-    fap_p = ls.false_alarm_probability(power.max())
-    fap_001 = ls.false_alarm_level(0.01)
-    return freq, power, period, fap_p, fap_001
+    def periodogram(self):
+        dt = [ self.t[i+1] - self.t[i-1] for i in range(1,len(self.t)-1)]
+        fmax = 1.0/np.median(dt)
+        fmin = 2.0/(max(self.t))
+        ls = LombScargle(self.t, self.flux, self.flux_err)
+        #Oversampling a factor of 10 to achieve frequency resolution
+        freq, power = ls.autopower(minimum_frequency=fmin,
+                                   maximum_frequency=fmax,
+                                   samples_per_peak=10)
+        best_f = freq[np.argmax(power)]
+        period = 1.0/best_f #period from the LS periodogram
+        fap_p = ls.false_alarm_probability(power.max())
+        fap_001 = ls.false_alarm_level(0.01)
+
+        self.freq = np.array(freq)
+        self.power = np.array(power)
+        self.period = period
+        self.fap_p = fap_p
+        self.fap_001 = fap_001
 
 def running_mean(x, N):
     cumsum = np.cumsum(np.insert(x, 0, 0))
