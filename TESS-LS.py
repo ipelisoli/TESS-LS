@@ -67,6 +67,7 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
     plt.plot(1.0/f, pow, color ='k')
     plt.xlim(min(1.0/f), max(1.0/f))
     plt.axhline(fap, color='b')
+    plt.axvline(period, color='r', ls='--', zorder=0)
 
     #plt.axvspan(100., max(1.0/freq), alpha=0.5, color='red')
     plt.xscale('log')
@@ -86,10 +87,10 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
     plt.xlabel('Phase')
     plt.ylabel('Relative flux')
     plt.xlim(0,2)
-    plt.errorbar(phi, flux_phi, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
+    #plt.errorbar(phi, flux_phi, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
     plt.plot(tul.running_mean(phi,100), tul.running_mean(flux_phi,100),'.k', zorder=1)
     plt.plot(phi, fit, 'r--', lw = 3, zorder=2)
-    plt.errorbar(phi+1.0, flux_phi, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
+    #plt.errorbar(phi+1.0, flux_phi, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
     plt.plot(tul.running_mean(phi,100)+1.0, tul.running_mean(flux_phi,100),'.k', zorder=1)
     plt.plot(phi + 1.0, fit,'r--', lw = 3, zorder=2)
 
@@ -98,10 +99,10 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
     plt.xlabel('Phase')
     plt.ylabel('Relative flux')
     plt.xlim(0,2)
-    plt.errorbar(phi2, flux_phi2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
+    #plt.errorbar(phi2, flux_phi2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
     plt.plot(tul.running_mean(phi2,100), tul.running_mean(flux_phi2,100),'.k', zorder=1)
     plt.plot(phi2, fit2, 'r--', lw = 3, zorder=2)
-    plt.errorbar(phi2+1.0, flux_phi2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
+    #plt.errorbar(phi2+1.0, flux_phi2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
     plt.plot(tul.running_mean(phi2,100)+1.0, tul.running_mean(flux_phi2,100),'.k', zorder=1)
     plt.plot(phi2 + 1.0, fit2, 'r--', lw = 3, zorder=2)
 
