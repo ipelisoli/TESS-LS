@@ -102,7 +102,7 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
     plt.plot(phi2, fit2, 'r--', lw = 3, zorder=2)
     plt.errorbar(phi2+1.0, flux_phi2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
     plt.plot(tul.running_mean(phi2,100)+1.0, tul.running_mean(flux_phi2,100),'.k', zorder=1)
-    plt.plot(phi2 + 1.0, fit2,'r--', lw = 3, zorder=2)
+    plt.plot(phi2 + 1.0, fit2, 'r--', lw = 3, zorder=2)
 
     plt.tight_layout()
 
@@ -267,16 +267,15 @@ if (flag_ls == 1):
 slow_lc.phase_data(1.0)
 phase = slow_lc.phase
 flux_phased = slow_lc.flux_phased
-flux_err_phased = slow_lc.flux_phased
-flux_fit = slow_lc.flux_phased
+flux_err_phased = slow_lc.flux_err_phased
+flux_fit = slow_lc.flux_fit
 amp = slow_lc.amp
-
 # Folds the data to twice the dominant peak
 slow_lc.phase_data(2.0)
 phase2 = slow_lc.phase
 flux_phased2 = slow_lc.flux_phased
-flux_err_phased2 = slow_lc.flux_phased
-flux_fit2 = slow_lc.flux_phased
+flux_err_phased2 = slow_lc.flux_err_phased
+flux_fit2 = slow_lc.flux_fit
 amp2 = slow_lc.amp
 
 if (flag_ph == 1):
@@ -292,6 +291,58 @@ plot = make_plot(slow_lc.freq, slow_lc.power, slow_lc.fap_001, BJD_or, flux_or,
                  phase2, flux_phased2, flux_fit2, slow_lc.period, slow_lc.crowdsap)
 
 plot.savefig('TIC%09d.png'%(TIC))
+
+################################
+
+######  20-SECOND DATA  ########
+
+if fast:
+    fast_lc = tul.LCdata(TIC)
+
+    fast_lc.read_data(infile_fast)
+    BJD_or = fast_lc.bjd
+    flux_or = fast_lc.flux
+
+    fast_lc.clean_data()
+    if (flag_lc == 1):
+        ascii.write([fast_lc.bjd, fast_lc.flux, fast_lc.flux_err],
+                    'TIC%09d_lc_fast.dat'%(TIC), names=['BJD','RelativeFlux','Error'],
+                    overwrite=True)
+
+    # Calculates the periodogram
+    fast_lc.periodogram()
+    if (flag_ls == 1):
+        ascii.write([1/fast_lc.freq, fast_lc.power], 'TIC%09d_ls_fast.dat'%(TIC),
+                    names=['Period[h]','Power'], overwrite=True)
+
+    # Folds the data to the dominant peak
+    fast_lc.phase_data(1.0)
+    phase = fast_lc.phase
+    flux_phased = fast_lc.flux_phased
+    flux_err_phased = fast_lc.flux_err_phased
+    flux_fit = fast_lc.flux_fit
+    fast_amp = fast_lc.amp
+    # Folds the data to twice the dominant peak
+    fast_lc.phase_data(2.0)
+    phase2 = fast_lc.phase
+    flux_phased2 = fast_lc.flux_phased
+    flux_err_phased2 = fast_lc.flux_err_phased
+    flux_fit2 = fast_lc.flux_fit
+    fast_amp2 = fast_lc.amp
+
+    if (flag_ph == 1):
+        if (flag_p2 == 1):
+            ascii.write([phase2, flux_phased2, flux_err_phased2], 'TIC%09d_phase_fast.dat'%(TIC),
+                        names=['Phase','RelativeFlux','Error'], overwrite=True)
+        else:
+            ascii.write([phase, flux_phased, flux_err_phased], 'TIC%09d_phase_fast.dat'%(TIC),
+                        names=['Phase','RelativeFlux','Error'], overwrite=True)
+
+    plot_fast = make_plot(fast_lc.freq, fast_lc.power, fast_lc.fap_001, BJD_or, flux_or,
+                          fast_lc.bjd, fast_lc.flux, phase, flux_phased, flux_fit,
+                          phase2, flux_phased2, flux_fit2, fast_lc.period, fast_lc.crowdsap)
+
+    plot_fast.savefig('TIC%09d_fast.png'%(TIC))
 
 ################################
 
@@ -314,12 +365,17 @@ if (flag_p2 == 1):
     log.write("Period = %9.5f hours, Amplitude =  %7.5f per cent\n"%(2.0*slow_lc.period, 100*abs(amp2)))
 else:
     log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent\n"%(slow_lc.period, 100*abs(amp)))
-
 log.write("FAP = %7.5e\n\n"%(slow_lc.fap_p))
 
 if fast:
     log.write("20-second cadence data\n")
-    log.write("Number of sectors: %2d\n\n"%(len(infile_fast)))
+    log.write("Number of sectors: %2d\n"%(len(infile_fast)))
+    log.write("CROWDSAP: %5.3f\n"%(np.mean(fast_lc.crowdsap)))
+    if (flag_p2 == 1):
+        log.write("Period = %9.5f hours, Amplitude =  %7.5f per cent\n"%(2.0*fast_lc.period, 100*abs(fast_amp2)))
+    else:
+        log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent\n"%(fast_lc.period, 100*abs(fast_amp)))
+    log.write("FAP = %7.5e\n\n"%(fast_lc.fap_p))
 else:
     log.write("No fast-candence data available.\n\n")
 
