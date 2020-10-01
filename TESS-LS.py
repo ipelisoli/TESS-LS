@@ -12,118 +12,19 @@ __author__ = 'Ingrid Pelisoli'
 # Importing relevant packages:
 
 import numpy as np
-from scipy import optimize
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-import astropy.units as u
+from astropy.io import ascii
+from astropy.io import fits
+from astropy.io.votable import parse_single_table
+from astroquery.mast import Observations
+from astroquery.gaia import Gaia
 from astropy import wcs
 from astropy.coordinates import SkyCoord, Distance, Angle
 from astropy.time import Time
-from astroquery.mast import Observations
-from astroquery.gaia import Gaia
-from astropy.io import fits
-from astropy.io import ascii
-from astropy.timeseries import LombScargle
-from astropy.stats import sigma_clip
-from astropy.io.votable import parse_single_table
-from math import pi
+import astropy.units as u
 import sys
-
-# Defining useful functions
-
-def periodogram(t, flux, flux_err):
-    dt = [ t[i+1] - t[i-1] for i in range(1,len(t)-1)]
-    fmax = 1.0/np.median(dt)
-    fmin = 2.0/(max(t))
-    ls = LombScargle(t, flux, flux_err)
-    #Oversampling a factor of 10 to achieve frequency resolution
-    freq, power = ls.autopower(minimum_frequency=fmin,
-                               maximum_frequency=fmax,
-                               samples_per_peak=10)
-    best_f = freq[np.argmax(power)]
-    period = 1.0/best_f #period from the LS periodogram
-    fap_p = ls.false_alarm_probability(power.max())
-    fap_001 = ls.false_alarm_level(0.01)
-    return freq, power, period, fap_p, fap_001
-
-def running_mean(x, N):
-    cumsum = np.cumsum(np.insert(x, 0, 0))
-    return (cumsum[N:] - cumsum[:-N]) / float(N)
-    #return np.convolve(x, np.ones((N,))/N, mode='valid')
-
-def chi_sq(guess, x, y, err, factor):
-    a, b = guess
-    model = 1.0+a*np.sin(factor*2.0*pi*x + b)
-    var = np.array(err)*np.array(err)
-    chisq = np.sum((model - y) * (model - y)/var)
-    return chisq
-
-def phase_data(t, flux, flux_err, period, factor):
-    period = factor*period
-    phase = ((t - t[0]) / period) % 1.0
-    flux_phased = [flux for phase, flux in sorted(zip(phase, flux))]
-    flux_err_phased = [flux_err for phase, flux_err in sorted(zip(phase, flux_err))]
-    phase = np.sort(phase)
-    # Fit the data
-    initial = np.array([np.mean(flux), 0.0])
-    solution = optimize.minimize(chi_sq, initial,args=(running_mean(phase,100),
-                                                       running_mean(flux_phased,100),
-                                                       running_mean(flux_err_phased,100),
-                                                        factor))
-    flux_fit = 1.0 + solution.x[0] * np.sin(factor*2.*np.pi*phase + solution.x[1])
-    return phase, flux_phased, flux_err_phased, flux_fit, solution.x[0]
-
-def read_data(list):
-    # Open data for the first sector
-
-    crowdsap = []
-
-    with fits.open(list[0]) as TESSdata:
-        data=TESSdata[1].data
-        BJD = np.array(data['TIME'])
-        flux = np.array(data['PDCSAP_FLUX'])
-        err_flux = np.array(data['PDCSAP_FLUX_ERR'])
-        err_flux = err_flux / np.nanmean(flux)
-        flux = flux / np.nanmean(flux)
-        header=TESSdata[1].header
-        crowdsap.append(header['CROWDSAP'])
-
-        # If there are more sectors, open data for the remaning sectors
-
-        if (len(list) > 1):
-            for i in range(1,len(list)):
-                with fits.open(list[i]) as TESSdata:
-                    data=TESSdata[1].data
-                    BJD = np.append(BJD, np.array(data['TIME']))
-                    f = np.array(data['PDCSAP_FLUX'])
-                    ef = np.array(data['PDCSAP_FLUX_ERR'])
-                    flux = np.append(flux, f / np.nanmean(f))
-                    err_flux = np.append(err_flux, ef / np.nanmean(f))
-                    header=TESSdata[1].header
-                    crowdsap.append(header['CROWDSAP'])
-
-    err_flux = err_flux / np.nanmean(flux)
-    flux = flux / np.nanmean(flux)
-
-    return BJD, flux, err_flux, crowdsap
-
-def clean_data(t, f, err_f):
-    # removing nan values
-    index = ~(np.isnan(t) | np.isnan(f))
-
-    f = f[index]
-    err_f = err_f[index]
-    t = t[index]
-
-    # sigma-clipping
-    filtered_data = sigma_clip(f, sigma=5, maxiters=None)
-    index = ~(filtered_data.mask)
-
-    f = f[index]
-    err_f = err_f[index]
-    t = t[index]
-
-    return t, f, err_f
+import TESSutils as tul
 
 # First we define the object name using the TIC
 
@@ -180,12 +81,12 @@ with fits.open(tp) as TPdata:
     flux_map = flux_map[0]
 
 # Read data
-BJD, flux, err_flux, crowdsap = read_data(infile)
+BJD, flux, err_flux, crowdsap = tul.read_data(infile)
 BJD_or = BJD
 flux_or = flux
 
 # Data pre-processing
-BJD, flux, err_flux = clean_data(BJD, flux, err_flux)
+BJD, flux, err_flux = tul.clean_data(BJD, flux, err_flux)
 
 t = (BJD - BJD[0])*24.0 #time in hours
 
@@ -195,17 +96,17 @@ if (flag_lc == 1):
 
 # Calculates the periodogram
 
-freq, power, period, fap_p, fap_001 = periodogram(t, flux, err_flux)
+freq, power, period, fap_p, fap_001 = tul.periodogram(t, flux, err_flux)
 
 if (flag_ls == 1):
     ascii.write([1/freq, power], 'TIC%09d_ls.dat'%(TIC),
                 names=['Period[h]','Power'], overwrite=True)
 
 # Folds the data to the dominant peak
-phase, flux_phased, flux_err_phased, flux_fit, amp = phase_data(t, flux, err_flux, period, 1.0)
+phase, flux_phased, flux_err_phased, flux_fit, amp = tul.phase_data(t, flux, err_flux, period, 1.0)
 
 # Folds the data to twice the dominant peak
-phase2, flux_phased2, flux_err_phased2, flux_fit2, amp2 = phase_data(t, flux, err_flux, period, 2.0)
+phase2, flux_phased2, flux_err_phased2, flux_fit2, amp2 = tul.phase_data(t, flux, err_flux, period, 2.0)
 
 if (flag_ph == 1):
     if (flag_p2 == 1):
@@ -361,10 +262,10 @@ plt.xlabel('Phase')
 plt.ylabel('Relative flux')
 plt.xlim(0,2)
 plt.errorbar(phase,flux_phased, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-plt.plot(running_mean(phase,100), running_mean(flux_phased,100),'.k', zorder=1)
+plt.plot(tul.running_mean(phase,100), tul.running_mean(flux_phased,100),'.k', zorder=1)
 plt.plot(phase, flux_fit, 'r--', lw = 3, zorder=2)
 plt.errorbar(phase+1.0,flux_phased, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-plt.plot(running_mean(phase,100)+1.0, running_mean(flux_phased,100),'.k', zorder=1)
+plt.plot(tul.running_mean(phase,100)+1.0, tul.running_mean(flux_phased,100),'.k', zorder=1)
 plt.plot(phase + 1.0, flux_fit,'r--', lw = 3, zorder=2)
 
 plt.subplot2grid((6,10), (3,4), colspan=6, rowspan=3)
@@ -373,10 +274,10 @@ plt.xlabel('Phase')
 plt.ylabel('Relative flux')
 plt.xlim(0,2)
 plt.errorbar(phase2,flux_phased2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-plt.plot(running_mean(phase2,100), running_mean(flux_phased2,100),'.k', zorder=1)
+plt.plot(tul.running_mean(phase2,100), tul.running_mean(flux_phased2,100),'.k', zorder=1)
 plt.plot(phase2, flux_fit2, 'r--', lw = 3, zorder=2)
 plt.errorbar(phase2+1.0,flux_phased2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-plt.plot(running_mean(phase2,100)+1.0, running_mean(flux_phased2,100),'.k', zorder=1)
+plt.plot(tul.running_mean(phase2,100)+1.0, tul.running_mean(flux_phased2,100),'.k', zorder=1)
 plt.plot(phase2 + 1.0, flux_fit2, 'r--', lw = 3, zorder=2)
 
 plt.tight_layout()

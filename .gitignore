@@ -4,3 +4,4 @@ mastDownload/
 *.dat
 *.png
 .DS_Store
+__pycache__/
