@@ -107,6 +107,24 @@ def read_data(list):
 
     return BJD, flux, err_flux, crowdsap
 
+def clean_data(t, f, err_f):
+    # removing nan values
+    index = ~(np.isnan(t) | np.isnan(f))
+
+    f = f[index]
+    err_f = err_f[index]
+    t = t[index]
+
+    # sigma-clipping
+    filtered_data = sigma_clip(f, sigma=5, maxiters=None)
+    index = ~(filtered_data.mask)
+
+    f = f[index]
+    err_f = err_f[index]
+    t = t[index]
+
+    return t, f, err_f
+
 # First we define the object name using the TIC
 
 TIC = np.int(sys.argv[1])
@@ -166,22 +184,8 @@ BJD, flux, err_flux, crowdsap = read_data(infile)
 BJD_or = BJD
 flux_or = flux
 
-# Data pre-processing: removing nan values
-
-index = ~(np.isnan(BJD) | np.isnan(flux))
-
-flux = flux[index]
-err_flux = err_flux[index]
-BJD = BJD[index]
-
-# Data pre-processsing: sigma-clipping
-
-filtered_data = sigma_clip(flux, sigma=5, maxiters=None)
-index = ~(filtered_data.mask)
-
-flux = flux[index]
-err_flux = err_flux[index]
-BJD = BJD[index]
+# Data pre-processing
+BJD, flux, err_flux = clean_data(BJD, flux, err_flux)
 
 t = (BJD - BJD[0])*24.0 #time in hours
 
