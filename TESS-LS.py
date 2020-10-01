@@ -65,8 +65,9 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
     plt.subplot2grid((6,10), (2,0), colspan=4, rowspan=2)
     plt.title("Period = %5.2f h"%period)
     plt.plot(1.0/f, pow, color ='k')
-    plt.xlim(min(1.0/f), max(1.0/pow))
+    plt.xlim(min(1.0/f), max(1.0/f))
     plt.axhline(fap, color='b')
+
     #plt.axvspan(100., max(1.0/freq), alpha=0.5, color='red')
     plt.xscale('log')
     plt.xlabel('P [h]')
