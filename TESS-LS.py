@@ -73,6 +73,40 @@ def phase_data(t, flux, flux_err, period, factor):
     flux_fit = 1.0 + solution.x[0] * np.sin(factor*2.*np.pi*phase + solution.x[1])
     return phase, flux_phased, flux_err_phased, flux_fit, solution.x[0]
 
+def read_data(list):
+    # Open data for the first sector
+
+    crowdsap = []
+
+    with fits.open(list[0]) as TESSdata:
+        data=TESSdata[1].data
+        BJD = np.array(data['TIME'])
+        flux = np.array(data['PDCSAP_FLUX'])
+        err_flux = np.array(data['PDCSAP_FLUX_ERR'])
+        err_flux = err_flux / np.nanmean(flux)
+        flux = flux / np.nanmean(flux)
+        header=TESSdata[1].header
+        crowdsap.append(header['CROWDSAP'])
+
+        # If there are more sectors, open data for the remaning sectors
+
+        if (len(list) > 1):
+            for i in range(1,len(list)):
+                with fits.open(list[i]) as TESSdata:
+                    data=TESSdata[1].data
+                    BJD = np.append(BJD, np.array(data['TIME']))
+                    f = np.array(data['PDCSAP_FLUX'])
+                    ef = np.array(data['PDCSAP_FLUX_ERR'])
+                    flux = np.append(flux, f / np.nanmean(f))
+                    err_flux = np.append(err_flux, ef / np.nanmean(f))
+                    header=TESSdata[1].header
+                    crowdsap.append(header['CROWDSAP'])
+
+    err_flux = err_flux / np.nanmean(flux)
+    flux = flux / np.nanmean(flux)
+
+    return BJD, flux, err_flux, crowdsap
+
 # First we define the object name using the TIC
 
 TIC = np.int(sys.argv[1])
@@ -127,33 +161,8 @@ with fits.open(tp) as TPdata:
     flux_map = data['FLUX']
     flux_map = flux_map[0]
 
-# Open data for the first sector
-
-crowdsap = []
-
-with fits.open(infile[0]) as TESSdata:
-    data=TESSdata[1].data
-    BJD = np.array(data['TIME'])
-    flux = np.array(data['PDCSAP_FLUX'])
-    err_flux = np.array(data['PDCSAP_FLUX_ERR'])
-    err_flux = err_flux / np.nanmean(flux)
-    flux = flux / np.nanmean(flux)
-    header=TESSdata[1].header
-    crowdsap.append(header['CROWDSAP'])
-
-# If there are more sectors, open data for the remaning sectors
-
-if (len(infile) > 1):
-    for i in range(1,len(infile)):
-        with fits.open(infile[i]) as TESSdata:
-            data=TESSdata[1].data
-            BJD = np.append(BJD, np.array(data['TIME']))
-            f = np.array(data['PDCSAP_FLUX'])
-            ef = np.array(data['PDCSAP_FLUX_ERR'])
-            flux = np.append(flux, f / np.nanmean(f))
-            err_flux = np.append(err_flux, ef / np.nanmean(f))
-            header=TESSdata[1].header
-            crowdsap.append(header['CROWDSAP'])
+# Read data
+BJD, flux, err_flux, crowdsap = read_data(infile)
 BJD_or = BJD
 flux_or = flux
 
