@@ -21,6 +21,12 @@ class LCdata:
         self.fap_p = []
         self.fap_001 = []
 
+        self.phase = []
+        self.flux_phased = []
+        self.flux_err_phased = []
+        self.flux_fit = []
+        self.amp = []
+
     def read_data(self, list):
         crowdsap = []
 
@@ -94,6 +100,28 @@ class LCdata:
         self.fap_p = fap_p
         self.fap_001 = fap_001
 
+    def phase_data(self, factor):
+        period = factor*self.period
+        phase = ((self.t - self.t[0]) / period) % 1.0
+        f = self.flux
+        ef = self.flux_err
+        flux_phased = [f for phase, f in sorted(zip(phase, f))]
+        flux_err_phased = [ef for phase, ef in sorted(zip(phase, ef))]
+        phase = np.sort(phase)
+        # Fit the data
+        initial = np.array([np.mean(self.flux), 0.0])
+        solution = optimize.minimize(chi_sq, initial, args=(running_mean(phase,100),
+                                                            running_mean(flux_phased,100),
+                                                            running_mean(flux_err_phased,100),
+                                                            factor))
+        flux_fit = 1.0 + solution.x[0] * np.sin(factor*2.*np.pi*phase + solution.x[1])
+
+        self.phase = np.array(phase)
+        self.flux_phased = np.array(flux_phased)
+        self.flux_err_phased = np.array(flux_err_phased)
+        self.flux_fit = np.array(flux_fit)
+        self.amp = solution.x[0]
+
 def running_mean(x, N):
     cumsum = np.cumsum(np.insert(x, 0, 0))
     return (cumsum[N:] - cumsum[:-N]) / float(N)
@@ -105,18 +133,3 @@ def chi_sq(guess, x, y, err, factor):
     var = np.array(err)*np.array(err)
     chisq = np.sum((model - y) * (model - y)/var)
     return chisq
-
-def phase_data(t, flux, flux_err, period, factor):
-    period = factor*period
-    phase = ((t - t[0]) / period) % 1.0
-    flux_phased = [flux for phase, flux in sorted(zip(phase, flux))]
-    flux_err_phased = [flux_err for phase, flux_err in sorted(zip(phase, flux_err))]
-    phase = np.sort(phase)
-    # Fit the data
-    initial = np.array([np.mean(flux), 0.0])
-    solution = optimize.minimize(chi_sq, initial,args=(running_mean(phase,100),
-                                                       running_mean(flux_phased,100),
-                                                       running_mean(flux_err_phased,100),
-                                                        factor))
-    flux_fit = 1.0 + solution.x[0] * np.sin(factor*2.*np.pi*phase + solution.x[1])
-    return phase, flux_phased, flux_err_phased, flux_fit, solution.x[0]

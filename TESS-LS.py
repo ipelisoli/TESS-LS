@@ -6,10 +6,10 @@
 # folded light to both the period and twice the period (useful for binary
 # systems where the dominant peak is often an alias).
 
-__version__ = '1.0'
+__version__ = '2.0'
 __author__ = 'Ingrid Pelisoli'
 
-# Importing relevant packages:
+#####  IMPORTING PACKAGES  ######
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,6 +25,90 @@ from astropy.time import Time
 import astropy.units as u
 import sys
 import TESSutils as tul
+
+################################
+
+###  FUNCTION FOR PLOTTING  ####
+
+def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
+              flux_phi, fit, phi2, flux_phi2, fit2, period, crowd):
+
+    fig = plt.figure(figsize=(24,15))
+
+    plt.rcParams.update({'font.size': 22})
+
+    gridspec.GridSpec(6,10)
+
+    plt.subplot2grid((6,10), (0,0), colspan=2, rowspan=2)
+    plt.title('TIC %d'%(TIC))
+    plt.xlim(0,10)
+    plt.ylim(10,0)
+    plt.imshow(flux_map, interpolation='nearest')
+    if not warning:
+        plt.scatter(coords[:, 0], coords[:, 1], c='firebrick', alpha=0.5, edgecolors='r', s=sizes)
+        plt.scatter(coords[:, 0], coords[:, 1], c='None', edgecolors='r', s=sizes)
+    plt.text(0.1, 9.9, 'crowdsap = %4.2f' % np.mean(crowd), color='w')
+    plt.ylabel('Pixel count')
+    plt.xlabel('Pixel count')
+
+    plt.subplot2grid((6,10), (0,2), colspan=2, rowspan=2)
+    plt.scatter(s_bprp, s_MG, c='0.75', s=0.5, zorder=0)
+    if (len(gaia)>1):
+        plt.scatter(bprp_all, MG_all, marker='s',c='b', s=10, zorder=1)
+    plt.gca().invert_yaxis()
+    plt.title('$Gaia$ HR-diagram')
+    if not warning:
+        plt.plot(bprp, MG, 'or',markersize=10,zorder=2)
+    plt.ylabel('$M_G$')
+    plt.xlabel('$G_{BP}-G_{RP}$')
+
+    plt.subplot2grid((6,10), (2,0), colspan=4, rowspan=2)
+    plt.title("Period = %5.2f h"%period)
+    plt.plot(1.0/f, pow, color ='k')
+    plt.xlim(min(1.0/f), max(1.0/pow))
+    plt.axhline(fap, color='b')
+    #plt.axvspan(100., max(1.0/freq), alpha=0.5, color='red')
+    plt.xscale('log')
+    plt.xlabel('P [h]')
+    plt.ylabel('Power')
+
+    plt.subplot2grid((6,10), (4,0), colspan=4, rowspan=2)
+    plt.title('%s sector/s'%len(infile))
+    plt.xlabel("BJD - 2457000")
+    plt.ylabel('Relative flux')
+    plt.xlim(np.min(bjd), np.max(bjd))
+    plt.scatter(bjd0, flux0, c='0.25', zorder=1, s = 0.5)
+    plt.scatter(bjd, flux, c='k', zorder=1, s = 0.5)
+
+    plt.subplot2grid((6,10), (0,4), colspan=6, rowspan=3)
+    plt.title('Phased to dominant peak')
+    plt.xlabel('Phase')
+    plt.ylabel('Relative flux')
+    plt.xlim(0,2)
+    plt.errorbar(phi, flux_phi, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
+    plt.plot(tul.running_mean(phi,100), tul.running_mean(flux_phi,100),'.k', zorder=1)
+    plt.plot(phi, fit, 'r--', lw = 3, zorder=2)
+    plt.errorbar(phi+1.0, flux_phi, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
+    plt.plot(tul.running_mean(phi,100)+1.0, tul.running_mean(flux_phi,100),'.k', zorder=1)
+    plt.plot(phi + 1.0, fit,'r--', lw = 3, zorder=2)
+
+    plt.subplot2grid((6,10), (3,4), colspan=6, rowspan=3)
+    plt.title('Phased to twice the peak')
+    plt.xlabel('Phase')
+    plt.ylabel('Relative flux')
+    plt.xlim(0,2)
+    plt.errorbar(phi2, flux_phi2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
+    plt.plot(tul.running_mean(phi2,100), tul.running_mean(flux_phi2,100),'.k', zorder=1)
+    plt.plot(phi2, fit2, 'r--', lw = 3, zorder=2)
+    plt.errorbar(phi2+1.0, flux_phi2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
+    plt.plot(tul.running_mean(phi2,100)+1.0, tul.running_mean(flux_phi2,100),'.k', zorder=1)
+    plt.plot(phi2 + 1.0, fit2,'r--', lw = 3, zorder=2)
+
+    plt.tight_layout()
+
+    return fig
+
+################################
 
 #########  USER INPUT  #########
 
@@ -69,6 +153,8 @@ download_fast_lc = Observations.download_products(data,
 infile_fast = download_fast_lc[0][:]
 
 print("I have found a total of " + str(len(infile_fast)) + " 20-sec light curve(s).")
+
+fast = (len(infile_fast) > 0)
 
 # Dowload target pixel file for plotting
 
@@ -164,36 +250,34 @@ slow_lc = tul.LCdata(TIC)
 slow_lc.read_data(infile)
 BJD_or = slow_lc.bjd
 flux_or = slow_lc.flux
-crowdsap = slow_lc.crowdsap
 
 slow_lc.clean_data()
-BJD = slow_lc.bjd
-t = slow_lc.t
-flux = slow_lc.flux
-err_flux = slow_lc.flux_err
-
 if (flag_lc == 1):
-    ascii.write([BJD, flux, err_flux], 'TIC%09d_lc.dat'%(TIC),
-                names=['BJD','RelativeFlux','Error'], overwrite=True)
+    ascii.write([slow_lc.bjd, slow_lc.flux, slow_lc.flux_err],
+                'TIC%09d_lc.dat'%(TIC), names=['BJD','RelativeFlux','Error'],
+                overwrite=True)
 
 # Calculates the periodogram
-
 slow_lc.periodogram()
-freq = slow_lc.freq
-power = slow_lc.power
-period = slow_lc.period
-fap_p = slow_lc.fap_p
-fap_001 = slow_lc.fap_001
-
 if (flag_ls == 1):
-    ascii.write([1/freq, power], 'TIC%09d_ls.dat'%(TIC),
+    ascii.write([1/slow_lc.freq, slow_lc.power], 'TIC%09d_ls.dat'%(TIC),
                 names=['Period[h]','Power'], overwrite=True)
 
 # Folds the data to the dominant peak
-phase, flux_phased, flux_err_phased, flux_fit, amp = tul.phase_data(t, flux, err_flux, period, 1.0)
+slow_lc.phase_data(1.0)
+phase = slow_lc.phase
+flux_phased = slow_lc.flux_phased
+flux_err_phased = slow_lc.flux_phased
+flux_fit = slow_lc.flux_phased
+amp = slow_lc.amp
 
 # Folds the data to twice the dominant peak
-phase2, flux_phased2, flux_err_phased2, flux_fit2, amp2 = tul.phase_data(t, flux, err_flux, period, 2.0)
+slow_lc.phase_data(2.0)
+phase2 = slow_lc.phase
+flux_phased2 = slow_lc.flux_phased
+flux_err_phased2 = slow_lc.flux_phased
+flux_fit2 = slow_lc.flux_phased
+amp2 = slow_lc.amp
 
 if (flag_ph == 1):
     if (flag_p2 == 1):
@@ -203,7 +287,16 @@ if (flag_ph == 1):
         ascii.write([phase, flux_phased, flux_err_phased], 'TIC%09d_phase.dat'%(TIC),
                      names=['Phase','RelativeFlux','Error'], overwrite=True)
 
-# Writing log file
+plot = make_plot(slow_lc.freq, slow_lc.power, slow_lc.fap_001, BJD_or, flux_or,
+                 slow_lc.bjd, slow_lc.flux, phase, flux_phased, flux_fit,
+                 phase2, flux_phased2, flux_fit2, slow_lc.period, slow_lc.crowdsap)
+
+plot.savefig('TIC%09d.png'%(TIC))
+
+################################
+
+
+#########  WRITE LOG  ##########
 
 log = open('TIC%09d.log'%(TIC), "w")
 log.write("TIC %09d\n\n"%(TIC))
@@ -213,13 +306,22 @@ else:
     log.write("Gaia DR2 source_id = %20d\n"%(gaia_id))
     log.write("G = %6.3f, MG = %6.3f, bp_rp = %6.3f\n\n"%(G, MG, bprp))
 
+log.write("2-minute cadence data\n")
 log.write("Number of sectors: %2d\n"%(len(infile)))
-log.write("CROWDSAP: %5.3f\n"%(np.mean(crowdsap)))
+log.write("CROWDSAP: %5.3f\n"%(np.mean(slow_lc.crowdsap)))
 
 if (flag_p2 == 1):
-    log.write("Period = %9.5f hours, Amplitude =  %7.5f per cent\n\n"%(2.0*period, 100*abs(amp2)))
+    log.write("Period = %9.5f hours, Amplitude =  %7.5f per cent\n"%(2.0*slow_lc.period, 100*abs(amp2)))
 else:
-    log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent\n\n"%(period, 100*abs(amp)))
+    log.write("Best period = %9.5f hours, Amplitude =  %7.5f per cent\n"%(slow_lc.period, 100*abs(amp)))
+
+log.write("FAP = %7.5e\n\n"%(slow_lc.fap_p))
+
+if fast:
+    log.write("20-second cadence data\n")
+    log.write("Number of sectors: %2d\n\n"%(len(infile_fast)))
+else:
+    log.write("No fast-candence data available.\n\n")
 
 if (len(gaia)>0):
     log.write("Other matches within 30 arcsec:\n")
@@ -230,81 +332,5 @@ if (len(gaia)>0):
 
 log.close()
 
-# Generate plot
-
-fig = plt.figure(figsize=(24,15))
-
-plt.rcParams.update({'font.size': 22})
-
-gridspec.GridSpec(6,10)
-
-plt.subplot2grid((6,10), (0,0), colspan=2, rowspan=2)
-plt.title('TIC %d'%(TIC))
-plt.xlim(0,10)
-plt.ylim(10,0)
-plt.imshow(flux_map, interpolation='nearest')
-if not warning:
-    plt.scatter(coords[:, 0], coords[:, 1], c='firebrick', alpha=0.5, edgecolors='r', s=sizes)
-    plt.scatter(coords[:, 0], coords[:, 1], c='None', edgecolors='r', s=sizes)
-plt.text(0.1, 9.9, 'crowdsap = %4.2f' % np.mean(crowdsap), color='w')
-plt.ylabel('Pixel count')
-plt.xlabel('Pixel count')
-
-plt.subplot2grid((6,10), (0,2), colspan=2, rowspan=2)
-plt.scatter(s_bprp,s_MG,c='0.75', s=0.5, zorder=0)
-if (len(gaia)>1):
-    plt.scatter(bprp_all,MG_all,marker='s',c='b', s=10, zorder=1)
-plt.gca().invert_yaxis()
-plt.title('$Gaia$ HR-diagram')
-if not warning:
-    plt.plot(bprp,MG,'or',markersize=10,zorder=2)
-plt.ylabel('$M_G$')
-plt.xlabel('$G_{BP}-G_{RP}$')
-
-plt.subplot2grid((6,10), (2,0), colspan=4, rowspan=2)
-plt.title("Period = %5.2f h"%period)
-plt.plot(1.0/freq, power, color ='k')
-plt.xlim(min(1.0/freq),max(1.0/freq))
-plt.axhline(fap_001, color='b')
-#plt.axvspan(100., max(1.0/freq), alpha=0.5, color='red')
-plt.xscale('log')
-plt.xlabel('P [h]')
-plt.ylabel('Power')
-
-plt.subplot2grid((6,10), (4,0), colspan=4, rowspan=2)
-plt.title('%s sector/s'%len(infile))
-plt.xlabel("BJD - 2457000")
-plt.ylabel('Relative flux')
-plt.xlim(np.min(BJD), np.max(BJD))
-plt.scatter(BJD_or, flux_or, c='0.25', zorder=1, s = 0.5)
-plt.scatter(BJD, flux, c='k', zorder=1, s = 0.5)
-
-plt.subplot2grid((6,10), (0,4), colspan=6, rowspan=3)
-plt.title('Phased to dominant peak')
-plt.xlabel('Phase')
-plt.ylabel('Relative flux')
-plt.xlim(0,2)
-plt.errorbar(phase,flux_phased, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-plt.plot(tul.running_mean(phase,100), tul.running_mean(flux_phased,100),'.k', zorder=1)
-plt.plot(phase, flux_fit, 'r--', lw = 3, zorder=2)
-plt.errorbar(phase+1.0,flux_phased, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-plt.plot(tul.running_mean(phase,100)+1.0, tul.running_mean(flux_phased,100),'.k', zorder=1)
-plt.plot(phase + 1.0, flux_fit,'r--', lw = 3, zorder=2)
-
-plt.subplot2grid((6,10), (3,4), colspan=6, rowspan=3)
-plt.title('Phased to twice the peak')
-plt.xlabel('Phase')
-plt.ylabel('Relative flux')
-plt.xlim(0,2)
-plt.errorbar(phase2,flux_phased2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-plt.plot(tul.running_mean(phase2,100), tul.running_mean(flux_phased2,100),'.k', zorder=1)
-plt.plot(phase2, flux_fit2, 'r--', lw = 3, zorder=2)
-plt.errorbar(phase2+1.0,flux_phased2, fmt='.', color='0.5', markersize=0.75, elinewidth=0.5, zorder=0)
-plt.plot(tul.running_mean(phase2,100)+1.0, tul.running_mean(flux_phased2,100),'.k', zorder=1)
-plt.plot(phase2 + 1.0, flux_fit2, 'r--', lw = 3, zorder=2)
-
-plt.tight_layout()
-
-fig.savefig('TIC%09d.png'%(TIC))
 
 ################################
