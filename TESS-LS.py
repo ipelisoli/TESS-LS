@@ -31,7 +31,7 @@ import TESSutils as tul
 ###  FUNCTION FOR PLOTTING  ####
 
 def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
-              flux_phi, fit, phi2, flux_phi2, fit2, period, crowd):
+              flux_phi, fit, phi2, flux_phi2, fit2, period, crowd, ns):
 
     fig = plt.figure(figsize=(24,15))
 
@@ -74,7 +74,7 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
     plt.ylabel('Power')
 
     plt.subplot2grid((6,10), (4,0), colspan=4, rowspan=2)
-    plt.title('%s sector/s'%len(infile))
+    plt.title('%s sector/s'% ns)
     plt.xlabel("BJD - 2457000")
     plt.ylabel('Relative flux')
     plt.xlim(np.min(bjd), np.max(bjd))
@@ -154,6 +154,7 @@ obsTable = Observations.query_criteria(dataproduct_type="timeseries",
 data = Observations.get_product_list(obsTable)
 download_lc = Observations.download_products(data, productSubGroupDescription="LC")
 infile = download_lc[0][:]
+n_slow = len(infile)
 
 print("I have found a total of " + str(len(infile)) + " 2-min light curve(s).")
 
@@ -167,6 +168,7 @@ if download_fast_lc is None:
     fast = False
 else:
     infile_fast = download_fast_lc[0][:]
+    n_fast = len(infile_fast)
     print("I have found a total of " + str(len(download_fast_lc[0][:])) + " 20-sec light curve(s).")
     fast = True
 
@@ -302,7 +304,8 @@ if (flag_ph == 1):
 
 plot = make_plot(slow_lc.freq, slow_lc.power, slow_lc.fap_001, BJD_or, flux_or,
                  slow_lc.bjd, slow_lc.flux, phase, flux_phased, flux_fit,
-                 phase2, flux_phased2, flux_fit2, slow_lc.period, slow_lc.crowdsap)
+                 phase2, flux_phased2, flux_fit2, slow_lc.period, slow_lc.crowdsap,
+                 n_slow)
 
 plot.savefig('TIC%09d.png'%(TIC))
 
@@ -355,7 +358,8 @@ if fast:
 
     plot_fast = make_plot(fast_lc.freq, fast_lc.power, fast_lc.fap_001, BJD_or, flux_or,
                           fast_lc.bjd, fast_lc.flux, phase, flux_phased, flux_fit,
-                          phase2, flux_phased2, flux_fit2, fast_lc.period, fast_lc.crowdsap)
+                          phase2, flux_phased2, flux_fit2, fast_lc.period, fast_lc.crowdsap,
+                          n_fast)
 
     plot_fast.savefig('TIC%09d_fast.png'%(TIC))
 
