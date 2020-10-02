@@ -80,6 +80,10 @@ class LCdata:
         self.bjd = self.bjd[index]
         self.t = (self.bjd - self.bjd[0])*24.0
 
+        # renormalising
+        self.flux_err = self.flux_err/np.mean(self.flux)
+        self.flux = self.flux/np.mean(self.flux)
+        
     def periodogram(self):
         dt = [ self.t[i+1] - self.t[i-1] for i in range(1,len(self.t)-1)]
         fmax = 1.0/np.median(dt)
