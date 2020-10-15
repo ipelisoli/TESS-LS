@@ -189,6 +189,7 @@ with fits.open(tp) as TPdata:
     data=TPdata[1].data
     flux_map = data['FLUX']
     flux_map = flux_map[0]
+    flux_map = np.flip(flux_map, axis=0)  # This does't seem to always work
 
 ################################
 
@@ -198,7 +199,7 @@ with fits.open(tp) as TPdata:
 
 coord = SkyCoord(ra=obsTable[0][5], dec=obsTable[0][6],
                  unit=(u.degree, u.degree), frame='icrs')
-radius = u.Quantity(30.0, u.arcsec)
+radius = u.Quantity(105.0, u.arcsec)
 q = Gaia.cone_search_async(coord, radius)
 gaia = q.get_results()
 gaia = gaia[ np.nan_to_num(gaia['parallax']) > 0 ]
