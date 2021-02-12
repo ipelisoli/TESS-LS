@@ -22,6 +22,9 @@ from astroquery.gaia import Gaia
 from astropy import wcs
 from astropy.coordinates import SkyCoord, Distance, Angle
 from astropy.time import Time
+from astropy.visualization.mpl_normalize import ImageNormalize
+import astropy.visualization as stretching
+from lightkurve import search_targetpixelfile
 import astropy.units as u
 import sys
 import TESSutils as tul
@@ -41,13 +44,20 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
 
     plt.subplot2grid((6,10), (0,0), colspan=2, rowspan=2)
     plt.title('TIC %d'%(TIC))
-    plt.xlim(0,10)
-    plt.ylim(10,0)
-    plt.imshow(flux_map, interpolation='nearest')
+    mean_tpf = np.mean(tpf.flux,axis=0)
+    nx,ny = np.shape(mean_tpf)
+    norm = ImageNormalize(stretch=stretching.LogStretch())
+    division = np.int(np.log10(np.nanmax(np.nanmean(tpf.flux,axis=0))))
+    plt.imshow(np.nanmean(tpf.flux,axis=0)/10**division,norm=norm,extent=[tpf.column,tpf.column+ny,tpf.row,tpf.row+nx],origin='lower', zorder=0)
+    plt.xlim(tpf.column,tpf.column+10)
+    plt.ylim(tpf.row,tpf.row+10)
+    #plt.imshow(flux_map, interpolation='nearest')
     if not warning:
-        plt.scatter(coords[:, 0], coords[:, 1], c='firebrick', alpha=0.5, edgecolors='r', s=sizes)
-        plt.scatter(coords[:, 0], coords[:, 1], c='None', edgecolors='r', s=sizes)
-    plt.text(0.1, 9.9, 'crowdsap = %4.2f' % np.mean(crowd), color='w')
+        x = coords[:, 0]+tpf.column+0.5
+        y = coords[:, 1]+tpf.row+0.5
+        plt.scatter(x, y, c='firebrick', alpha=0.5, edgecolors='r', s=sizes)
+        plt.scatter(x, y, c='None', edgecolors='r', s=sizes)
+    plt.text(tpf.column, tpf.row, 'crowdsap = %4.2f' % np.mean(crowd), color='w')
     plt.ylabel('Pixel count')
     plt.xlabel('Pixel count')
 
@@ -173,6 +183,7 @@ else:
     fast = True
 
 # Dowload target pixel file for plotting
+tpf = search_targetpixelfile("TIC "+str(TIC), mission='TESS').download()
 
 tp_data = Observations.filter_products(data,productSubGroupDescription="TP")
 tp_id = str(tp_data['obsID'][0]) # We only need one TP
@@ -198,11 +209,11 @@ with fits.open(tp) as TPdata:
 
 #########  GAIA MATCH  #########
 
-# First do a large search using 11 pixels
+# First do a large search using 6 pixels
 
 coord = SkyCoord(ra=obsTable[0][5], dec=obsTable[0][6],
                  unit=(u.degree, u.degree), frame='icrs')
-radius = u.Quantity(105.0, u.arcsec)
+radius = u.Quantity(126.0, u.arcsec)
 q = Gaia.cone_search_async(coord, radius)
 gaia = q.get_results()
 # Select only those brighter than 18.
@@ -251,9 +262,9 @@ if not warning:
     bprp = np.float(bprp)
 
     # Coordinates for plotting
-    radecs = np.vstack([c2000[idx].ra, c2000[idx].dec]).T
-    coords = tp_wcs.all_world2pix(radecs, 0)
-    sizes = 8000.0 / 2**(g_all[idx]/2)
+    radecs = np.vstack([c2000.ra, c2000.dec]).T
+    coords = tpf.wcs.all_world2pix(radecs, 0.5)
+    sizes = 128.0 / 2**((g_all-best['phot_g_mean_mag']))
 
 # Reference sample
 
