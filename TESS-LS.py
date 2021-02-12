@@ -51,7 +51,6 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
     plt.imshow(np.nanmean(tpf.flux,axis=0)/10**division,norm=norm,extent=[tpf.column,tpf.column+ny,tpf.row,tpf.row+nx],origin='lower', zorder=0)
     plt.xlim(tpf.column,tpf.column+10)
     plt.ylim(tpf.row,tpf.row+10)
-    #plt.imshow(flux_map, interpolation='nearest')
     if not warning:
         x = coords[:, 0]+tpf.column+0.5
         y = coords[:, 1]+tpf.row+0.5
@@ -184,26 +183,6 @@ else:
 
 # Dowload target pixel file for plotting
 tpf = search_targetpixelfile("TIC "+str(TIC), mission='TESS').download()
-
-tp_data = Observations.filter_products(data,productSubGroupDescription="TP")
-tp_id = str(tp_data['obsID'][0]) # We only need one TP
-download_tp = Observations.download_products(tp_id,productSubGroupDescription="TP")
-tp = download_tp[0][0]
-with fits.open(tp) as TPdata:
-    # Create WCS object
-    tp_wcs = wcs.WCS(naxis=2)
-    tp_wcs.wcs.crpix = [TPdata[1].header['1CRPX4'], TPdata[1].header['2CRPX4']]
-    tp_wcs.wcs.cdelt = [TPdata[1].header['1CDLT4'], TPdata[1].header['2CDLT4']]
-    tp_wcs.wcs.crval = [TPdata[1].header['1CRVL4'], TPdata[1].header['2CRVL4']]
-    tp_wcs.wcs.ctype = [TPdata[1].header['1CTYP4'], TPdata[1].header['2CTYP4']]
-
-    data=TPdata[1].data
-    flux_map = data['FLUX']
-    flux_map = flux_map[0]
-    # This does't seem to always work:
-    flux_map = np.flip(flux_map, axis=0)
-    flux_map = np.flip(flux_map, axis=1)
-    # Figuring this out is on top of the to-do list.
 
 ################################
 
