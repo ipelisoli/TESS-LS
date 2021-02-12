@@ -189,19 +189,24 @@ with fits.open(tp) as TPdata:
     data=TPdata[1].data
     flux_map = data['FLUX']
     flux_map = flux_map[0]
-    flux_map = np.flip(flux_map, axis=0)  # This does't seem to always work
+    # This does't seem to always work:
+    flux_map = np.flip(flux_map, axis=0)
+    flux_map = np.flip(flux_map, axis=1)
+    # Figuring this out is on top of the to-do list.
 
 ################################
 
 #########  GAIA MATCH  #########
 
-# First do a large search using 30 arcsec
+# First do a large search using 11 pixels
 
 coord = SkyCoord(ra=obsTable[0][5], dec=obsTable[0][6],
                  unit=(u.degree, u.degree), frame='icrs')
 radius = u.Quantity(105.0, u.arcsec)
 q = Gaia.cone_search_async(coord, radius)
 gaia = q.get_results()
+# Select only those brighter than 18.
+gaia = gaia[gaia['phot_g_mean_mag'] < 18.]
 gaia = gaia[ np.nan_to_num(gaia['parallax']) > 0 ]
 warning = (len(gaia) == 0)
 
@@ -246,9 +251,9 @@ if not warning:
     bprp = np.float(bprp)
 
     # Coordinates for plotting
-    radecs = np.vstack([c2000.ra, c2000.dec]).T
+    radecs = np.vstack([c2000[idx].ra, c2000[idx].dec]).T
     coords = tp_wcs.all_world2pix(radecs, 0)
-    sizes = 10000.0 / 2**(g_all/2)
+    sizes = 8000.0 / 2**(g_all[idx]/2)
 
 # Reference sample
 
@@ -400,7 +405,7 @@ else:
     log.write("No fast-candence data available.\n\n")
 
 if (len(gaia)>0):
-    log.write("Other matches within 30 arcsec:\n")
+    log.write("Other G < 18. matches within 5 pixels:\n")
     log.write("source_id            G       MG    bp_rp\n")
     for i in range(0, len(gaia)):
         if i != idx:
