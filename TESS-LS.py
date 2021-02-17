@@ -56,6 +56,7 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
         y = coords[:, 1]+tpf.row+0.5
         plt.scatter(x, y, c='firebrick', alpha=0.5, edgecolors='r', s=sizes)
         plt.scatter(x, y, c='None', edgecolors='r', s=sizes)
+        plt.scatter(x[idx], y[idx], marker='x', c='white')
     plt.text(tpf.column, tpf.row, 'crowdsap = %4.2f' % np.mean(crowd), color='w')
     plt.ylabel('Pixel count')
     plt.xlabel('Pixel count')
