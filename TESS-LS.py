@@ -44,11 +44,11 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
 
     plt.subplot2grid((6,10), (0,0), colspan=2, rowspan=2)
     plt.title('TIC %d'%(TIC))
-    mean_tpf = np.mean(tpf.flux,axis=0)
+    mean_tpf = np.mean(tpf.flux.value,axis=0)
     nx,ny = np.shape(mean_tpf)
     norm = ImageNormalize(stretch=stretching.LogStretch())
-    division = np.int(np.log10(np.nanmax(np.nanmean(tpf.flux,axis=0))))
-    plt.imshow(np.nanmean(tpf.flux,axis=0)/10**division,norm=norm,extent=[tpf.column,tpf.column+ny,tpf.row,tpf.row+nx],origin='lower', zorder=0)
+    division = np.int(np.log10(np.nanmax(np.nanmean(tpf.flux.value,axis=0))))
+    plt.imshow(np.nanmean(tpf.flux.value,axis=0)/10**division,norm=norm,extent=[tpf.column,tpf.column+ny,tpf.row,tpf.row+nx],origin='lower', zorder=0)
     plt.xlim(tpf.column,tpf.column+10)
     plt.ylim(tpf.row,tpf.row+10)
     if not warning:
@@ -191,7 +191,7 @@ tpf = search_targetpixelfile("TIC "+str(TIC), mission='TESS').download()
 
 # First do a large search using 6 pixels
 
-coord = SkyCoord(ra=obsTable[0][10], dec=obsTable[0][11],
+coord = SkyCoord(ra=obsTable[0]['s_ra'], dec=obsTable[0]['s_dec'],
                  unit=(u.degree, u.degree), frame='icrs')
 radius = u.Quantity(126.0, u.arcsec)
 q = Gaia.cone_search_async(coord, radius)
