@@ -191,7 +191,7 @@ tpf = search_targetpixelfile("TIC "+str(TIC), mission='TESS').download()
 
 # First do a large search using 6 pixels
 
-coord = SkyCoord(ra=obsTable[0][5], dec=obsTable[0][6],
+coord = SkyCoord(ra=obsTable[0][10], dec=obsTable[0][11],
                  unit=(u.degree, u.degree), frame='icrs')
 radius = u.Quantity(126.0, u.arcsec)
 q = Gaia.cone_search_async(coord, radius)
