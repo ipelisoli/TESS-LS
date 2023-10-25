@@ -47,7 +47,7 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
     mean_tpf = np.mean(tpf.flux.value,axis=0)
     nx,ny = np.shape(mean_tpf)
     norm = ImageNormalize(stretch=stretching.LogStretch())
-    division = np.int(np.log10(np.nanmax(np.nanmean(tpf.flux.value,axis=0))))
+    division = int(np.log10(np.nanmax(np.nanmean(tpf.flux.value,axis=0))))
     plt.imshow(np.nanmean(tpf.flux.value,axis=0)/10**division,norm=norm,extent=[tpf.column,tpf.column+ny,tpf.row,tpf.row+nx],origin='lower', zorder=0)
     plt.xlim(tpf.column,tpf.column+10)
     plt.ylim(tpf.row,tpf.row+10)
@@ -135,7 +135,7 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
 
 # Define the object name using the TIC
 
-TIC = np.int(sys.argv[1])
+TIC = int(sys.argv[1])
 obj_name = "TIC " + str(TIC)
 
 # Output ascii light curve?
@@ -161,7 +161,14 @@ obsTable = Observations.query_criteria(dataproduct_type="timeseries",
 
 # Download the 2-minute cadence light curves
 
-data = Observations.get_product_list(obsTable)
+try:
+    data = Observations.get_product_list(obsTable)
+except:
+    log = open('TIC%09d_NO_DATA.log'%(TIC), "w")
+    log.write("No data found for TIC %09d\n"%(TIC))
+    log.close()
+    sys.exit()
+
 download_lc = Observations.download_products(data, productSubGroupDescription="LC")
 infile = download_lc[0][:]
 n_slow = len(infile)
@@ -236,10 +243,10 @@ if not warning:
     MG = 5 + 5*np.log10(best['parallax']/1000) + best['phot_g_mean_mag']
     bprp = best['bp_rp']
 
-    gaia_id = np.int(gaia_id)
-    G = np.float(best['phot_g_mean_mag'])
-    MG = np.float(MG)
-    bprp = np.float(bprp)
+    gaia_id = int(gaia_id)
+    G = float(best['phot_g_mean_mag'])
+    MG = float(MG)
+    bprp = float(bprp)
 
     # Coordinates for plotting
     radecs = np.vstack([c2000.ra, c2000.dec]).T
