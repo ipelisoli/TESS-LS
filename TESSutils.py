@@ -146,7 +146,7 @@ def running_mean(x, N):
     #return np.convolve(x, np.ones((N,))/N, mode='valid')
 
 def avg_array(ar, n):
-    ar2 = np.nanmedian(np.pad(ar, (0, n - ar.size%n), mode='constant', constant_values=np.NaN).reshape(-1, n), axis=1)
+    ar2 = np.nanmedian(np.pad(ar, (0, n - ar.size%n), mode='constant', constant_values=np.nan).reshape(-1, n), axis=1)
     return ar2
 
 def chi_sq(guess, x, y, err, factor):

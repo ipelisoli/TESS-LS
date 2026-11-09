@@ -44,20 +44,21 @@ def make_plot(f, pow, fap, bjd0, flux0, bjd, flux, phi,
 
     plt.subplot2grid((6,10), (0,0), colspan=2, rowspan=2)
     plt.title('TIC %d'%(TIC))
-    mean_tpf = np.mean(tpf.flux.value,axis=0)
-    nx,ny = np.shape(mean_tpf)
-    norm = ImageNormalize(stretch=stretching.LogStretch())
-    division = int(np.log10(np.nanmax(np.nanmean(tpf.flux.value,axis=0))))
-    plt.imshow(np.nanmean(tpf.flux.value,axis=0)/10**division,norm=norm,extent=[tpf.column,tpf.column+ny,tpf.row,tpf.row+nx],origin='lower', zorder=0)
-    plt.xlim(tpf.column,tpf.column+10)
-    plt.ylim(tpf.row,tpf.row+10)
-    if not warning:
-        x = coords[:, 0]+tpf.column+0.5
-        y = coords[:, 1]+tpf.row+0.5
-        plt.scatter(x, y, c='firebrick', alpha=0.5, edgecolors='r', s=sizes)
-        plt.scatter(x, y, c='None', edgecolors='r', s=sizes)
-        plt.scatter(x[idx], y[idx], marker='x', c='white')
-    plt.text(tpf.column, tpf.row, 'crowdsap = %4.2f' % np.mean(crowd), color='w')
+    if not no_tpf:
+        mean_tpf = np.mean(tpf.flux.value,axis=0)
+        nx,ny = np.shape(mean_tpf)
+        norm = ImageNormalize(stretch=stretching.LogStretch())
+        division = int(np.log10(np.nanmax(np.nanmean(tpf.flux.value,axis=0))))
+        plt.imshow(np.nanmean(tpf.flux.value,axis=0)/10**division,norm=norm,extent=[tpf.column,tpf.column+ny,tpf.row,tpf.row+nx],origin='lower', zorder=0)
+        plt.xlim(tpf.column,tpf.column+10)
+        plt.ylim(tpf.row,tpf.row+10)
+        if not warning:
+            x = coords[:, 0]+tpf.column+0.5
+            y = coords[:, 1]+tpf.row+0.5
+            plt.scatter(x, y, c='firebrick', alpha=0.5, edgecolors='r', s=sizes)
+            plt.scatter(x, y, c='None', edgecolors='r', s=sizes)
+            plt.scatter(x[idx], y[idx], marker='x', c='white')
+        plt.text(tpf.column, tpf.row, 'crowdsap = %4.2f' % np.mean(crowd), color='w')
     plt.ylabel('Pixel count')
     plt.xlabel('Pixel count')
 
@@ -170,7 +171,7 @@ except:
     sys.exit()
 
 download_lc = Observations.download_products(data, productSubGroupDescription="LC")
-infile = download_lc[0][:]
+infile = download_lc["Local Path"]
 n_slow = len(infile)
 
 print("I have found a total of " + str(len(infile)) + " 2-min light curve(s).")
@@ -184,14 +185,17 @@ if download_fast_lc is None:
     print("I have found no 20-sec light curves.")
     fast = False
 else:
-    infile_fast = download_fast_lc[0][:]
+    infile_fast = download_fast_lc["Local Path"]
     n_fast = len(infile_fast)
     print("I have found a total of " + str(len(download_fast_lc[0][:])) + " 20-sec light curve(s).")
     fast = True
 
 # Dowload target pixel file for plotting
-tpf = search_targetpixelfile("TIC "+str(TIC), mission='TESS').download()
-
+try:
+    tpf = search_targetpixelfile("TIC "+str(TIC), mission='TESS').download()
+    no_tpf = False
+except:
+    no_tpf = True
 ################################
 
 #########  GAIA MATCH  #########
@@ -201,7 +205,7 @@ tpf = search_targetpixelfile("TIC "+str(TIC), mission='TESS').download()
 coord = SkyCoord(ra=obsTable[0]['s_ra'], dec=obsTable[0]['s_dec'],
                  unit=(u.degree, u.degree), frame='icrs')
 radius = u.Quantity(126.0, u.arcsec)
-q = Gaia.cone_search_async(coord, radius)
+q = Gaia.cone_search_async(coord, radius=radius)
 gaia = q.get_results()
 # Select only those brighter than 18.
 gaia = gaia[gaia['phot_g_mean_mag'] < 18.]
@@ -250,7 +254,10 @@ if not warning:
 
     # Coordinates for plotting
     radecs = np.vstack([c2000.ra, c2000.dec]).T
-    coords = tpf.wcs.all_world2pix(radecs, 0.5)
+    try:
+        coords = tpf.wcs.all_world2pix(radecs, 0.5)
+    except:
+        pass
     sizes = 128.0 / 2**((g_all-best['phot_g_mean_mag']))
 
 # Reference sample
